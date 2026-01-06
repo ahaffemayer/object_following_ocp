@@ -1,7 +1,7 @@
 weights:
-  W_xREG: 0.001
-  W_uREG: 0.0001
-  W_gripper_pose: 10.0
+  W_xREG: 0.0000
+  W_uREG: 0.0000
+  W_gripper_pose: 10000.0
   W_gripper_pose_term: 10.0
   W_limit: 1000.0
 
@@ -11,7 +11,8 @@ mesh:
   texture_file: "material_0.png"
   scale: 0.1
   color: [0.8, 0.8, 0.8]
+  handle_rot : 45
 
 safety_threshold: 0.02
-T: 50
-dt: 0.02
+T: 240
+dt: 0.001
