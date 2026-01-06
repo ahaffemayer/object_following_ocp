@@ -46,6 +46,7 @@ class GraspGenerator:
                     )
                 )
         self.rdata = self.rmodel.createData()
+        self.cdata = self.cmodel.createData()
 
     def generate_grasps_configurations(self) -> list[np.ndarray]:
         """Generates a list of grasp configurations around the object pose."""
@@ -79,7 +80,7 @@ class GraspGenerator:
     def _create_IK_problem(self, q0: np.ndarray) -> OCP:
         """Creates an IK problem for the grasping task."""
 
-        weights = self.get_weights()
+        weights = self._get_weights()
         ik_ocp = OCP(
             rmodel=self.rmodel,
             cmodel=self.cmodel,
@@ -93,7 +94,8 @@ class GraspGenerator:
             T=3,
             dt=0.02,
         )
-        return ik_ocp
+        ik = ik_ocp.create_OCP()
+        return ik
 
     def _get_random_collision_free_configuration(self) -> np.ndarray:
         """Generates a random collision-free configuration for the robot."""
@@ -101,10 +103,10 @@ class GraspGenerator:
         for _ in range(max_trials):
             q_random = pin.randomConfiguration(self.rmodel)
             pin.framesForwardKinematics(self.rmodel, self.rdata, q_random)
-            pin.updateGeometryPlacements(self.rmodel, self.rdata, self.cmodel)
-            collisions = pin.computeCollisions(
-                self.rmodel, self.cmodel, self.rdata, True
+            pin.updateGeometryPlacements(
+                self.rmodel, self.rdata, self.cmodel, self.cdata
             )
+            collisions = pin.computeCollisions(self.cmodel, self.cdata, True)
             if not collisions:
                 return q_random
         raise RuntimeError("Failed to find a collision-free configuration.")
@@ -123,18 +125,18 @@ class GraspGenerator:
         """Adds an offset to a given pose."""
         new_translation = pose.translation + self._offset
         # return pin.SE3(pose.rotation, new_translation)
-        return
+        return pose
 
     def _check_grasp_validity(self, q: np.ndarray) -> bool:
         """Checks if a given grasp configuration is valid (collision-free)."""
         pin.framesForwardKinematics(self.rmodel, self.rdata, q)
-        pin.updateGeometryPlacements(self.rmodel, self.rdata, self.cmodel)
-        collisions = pin.computeCollisions(self.rmodel, self.cmodel, self.rdata, True)
+        pin.updateGeometryPlacements(self.rmodel, self.rdata, self.cmodel, self.cdata)
+        collisions = pin.computeCollisions(self.cmodel, self.cdata, True)
         if not collisions:
             # See if the end-effector is close enough to the object pose
             ee_frame_id = self.rmodel.getFrameId("panda_hand_tcp")
             ee_pose = self.rdata.oMf[ee_frame_id]
-            distance = pin.log6(ee_pose.inverse() * self._obj_pose).norm()
+            distance = np.linalg.norm(pin.log6(ee_pose.inverse() * self._obj_pose))
             if distance < 0.05:  # 5 cm threshold
                 return True
         return False
