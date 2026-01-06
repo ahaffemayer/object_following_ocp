@@ -18,10 +18,10 @@ robot_links = [
 
 self_collision_pairs = [
     ("panda_link4_capsule_0", "panda_link6_capsule_0"),
-    ("panda_link4_capsule_0", "panda_link7_capsule_0"),
-    ("panda_link5_capsule_0", "panda_link7_capsule_0"),
-    ("panda_link6_capsule_0", "panda_link7_capsule_0"),
-    ("panda_link0_capsule_0", "panda_link7_capsule_0")
+    # ("panda_link4_capsule_0", "panda_link7_capsule_0"),
+    # ("panda_link5_capsule_0", "panda_link7_capsule_0"),
+    # ("panda_link6_capsule_0", "panda_link7_capsule_0"),
+    # ("panda_link0_capsule_0", "panda_link7_capsule_0")
 ]
 
 def load_panda():
