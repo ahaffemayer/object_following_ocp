@@ -1,22 +1,15 @@
-import meshcat
 import numpy as np
 from pathlib import Path
 import pinocchio as pin
-import sys
-from typing import Any
-import numpy as np
-import colmpc as col
-import crocoddyl
-import pinocchio as pin
-import mim_solvers
-from pinocchio import visualize
 from robomeshcat import Scene, Object, Robot
 
-from robot_loader import load_reduced_panda, self_collision_pairs
+from grasp_generator import GraspGenerator
 from ocp import OCP
 from parser_config import load_config
-from trajectory import se3_sinusoid_trajectory
+from robot_loader import load_reduced_panda, self_collision_pairs
 from trajectory_parser import TrajectoryParser
+from trajectory import Trajectory, TrajectoryInConfigurationSpace, TrajectoryEvaluator
+
 
 if __name__ == "__main__":
     
@@ -81,27 +74,20 @@ if __name__ == "__main__":
     o.pose = ( start_1
     ).homogeneous
     
-    OCP_creator_1 = OCP(
-        rmodel,
-        cmodel,
-        start_1,
-        x0=np.concatenate((q0_0, np.zeros(rmodel.nv))),
-        joint_limits=True,
-        joint_limits_constraint=False,
-        with_callbacks=True,
-        weights=weights,
-        safety_threshold=0.02,
-        T=len(traj_robot),
-        dt=dt,
+    ### Generate the different grasps configurations around the object pose
+    grasp_generator = GraspGenerator(
+        obj_pose=start_1,
+        grasp_configurations_number=3,
     )
+    grasp_configurations = grasp_generator.generate_grasps_configurations()
+    print(f"Generated {len(grasp_configurations)} grasp configurations.")
     
-    ocp_1 = OCP_creator_1.create_OCP()
-    X_init = [np.concatenate((q0_0, np.zeros(rmodel.nv)))] * (OCP_creator_1._T)
-    U_init = ocp_1.problem.quasiStatic(X_init[:-1])
-    ocp_1.solve(X_init, U_init)
+    for i, qg in enumerate(grasp_configurations):
+        print(f"Grasp configuration {i}: {qg}")
+        r[:] = qg
+        input("Press Enter to continue to the next grasp configuration...")
     
-
-    q0_1 = ocp_1.xs[-1][:rmodel.nq]
+    q0_1 = grasp_configurations[0]
     
     OCP_creator = OCP(
         rmodel,
@@ -123,17 +109,24 @@ if __name__ == "__main__":
     scene.add_object(Object.create_sphere(radius=0.01, name=f'camera', color=[1, 1, 0]))
     scene["camera"].pos[:] = T_camera.translation
     
-    for i, xs in enumerate(ocp_1.xs):
-        pin.framesForwardKinematics(rmodel, rdata, xs[:rmodel.nq])
-        ee_pose = rdata.oMf[rmodel.getFrameId("panda_hand_tcp")]
-        r[:] = xs[:rmodel.nq]
-        input("Press Enter to continue to the next state...")
     # Solve the OCP
     import time
     start_time = time.time()
     ocp.solve(X_init, U_init)
     end_time = time.time()
     print(f"OCP solved in {end_time - start_time} seconds")
+    
+    
+    ### Trajectory evaluation
+    traj_in_configuration_space = TrajectoryInConfigurationSpace(
+        [ocp.xs[k][: rmodel.nq] for k in range(OCP_creator._T)]
+    )
+    traj = Trajectory(traj_robot)
+    evaluator = TrajectoryEvaluator(traj, traj_in_configuration_space, rmodel)
+    position_error = evaluator.evaluate_position_error()   
+    print("Position error:", position_error)
+    
+    ### Visualize the result   
     for i, (xs, target) in enumerate(zip(ocp.xs, traj_robot)):
         scene.add_object(Object.create_sphere(radius=0.01, name=f'target_{i}', color=[1, 0, 0]))
         scene[f'target_{i}'].pos[:] = target.translation
