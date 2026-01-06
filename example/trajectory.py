@@ -17,6 +17,46 @@ class Trajectory:
         return self.T
 
 
+class TrajectoryInConfigurationSpace:
+    def __init__(self, configurations: list[np.ndarray]) -> None:
+        self.configurations = configurations
+        self.T = len(configurations)
+
+    def __getitem__(self, index: int) -> np.ndarray:
+        return self.configurations[index]
+
+    def __len__(self) -> int:
+        return self.T
+    
+    def get_EE_poses(self, rmodel: pin.Model) -> list[pin.SE3]:
+        poses = []
+        rdata = rmodel.createData()
+        for q in self.configurations:
+            pin.forwardKinematics(rmodel, rdata, q)
+            pin.updateFramePlacements(rmodel, rdata)
+            ee_frame_id = rmodel.getFrameId("panda_hand_tcp")
+            ee_pose = rmodel.frames[ee_frame_id].placement
+            poses.append(ee_pose)
+        return poses
+
+
+class TrajectoryEvaluator:
+    def __init__(self, trajectory: Trajectory, traj_in_configuration_space: TrajectoryInConfigurationSpace, rmodel: pin.Model) -> None:
+        self.trajectory = trajectory
+        self.traj_in_configuration_space = traj_in_configuration_space
+        self.rmodel = rmodel
+        self.T = trajectory.T
+    
+    def evaluate_position_error(self) -> float:
+        error = 0.0
+        ee_poses = self.traj_in_configuration_space.get_EE_poses(self.rmodel)
+        for k in range(self.T):
+            p_desired = self.trajectory[k].translation
+            p_actual = ee_poses[k].translation
+            error = np.linalg.norm(p_desired - p_actual)
+            error += error
+        return error
+
 
 def se3_sinusoid_trajectory(
     T0: pin.SE3,
