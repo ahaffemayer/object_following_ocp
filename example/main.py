@@ -75,11 +75,6 @@ if __name__ == "__main__":
     scene.add_object(o)
     weights = cfg["weights"]
 
-    
-    # for i, target in enumerate(traj_robot):
-    #     scene.add_object(Object.create_sphere(radius=0.01, name=f'target_{i}', color=[1, 0, 0]))
-    #     scene[f'target_{i}'].pos[:] = target.translation
-
     q0_0 = pin.randomConfiguration(rmodel)
     print("Initial configuration:", q0_0)
     start_1 = traj_robot[0]
@@ -92,8 +87,7 @@ if __name__ == "__main__":
         start_1,
         x0=np.concatenate((q0_0, np.zeros(rmodel.nv))),
         joint_limits=True,
-        penalisation=False,
-        constraint=False,
+        joint_limits_constraint=False,
         with_callbacks=True,
         weights=weights,
         safety_threshold=0.02,
@@ -108,12 +102,6 @@ if __name__ == "__main__":
     
 
     q0_1 = ocp_1.xs[-1][:rmodel.nq]
-    # end_1 = pin.XYZQUATToSE3([0.5, -0.2, 0.5, 0.7071, 0.0, 0.7071, 0.0])
-    # start = pin.SE3(np.eye(3), np.array([0.5, 0.0, 0.5]))
-    # end = pin.SE3(np.eye(3), np.array([0.5, 0.2, 0.5]))
-    # TARGET_POSES = se3_sinusoid_trajectory(start_1, end_1, T=50)
-    
-    # TARGET_POSES_world = TARGET_POSES.transform(T_camera)
     
     OCP_creator = OCP(
         rmodel,
@@ -121,8 +109,7 @@ if __name__ == "__main__":
         traj_robot,
         x0=np.concatenate((q0_1, np.zeros(rmodel.nv))),
         joint_limits=True,
-        penalisation=False,
-        constraint=False,
+        joint_limits_constraint=False,
         with_callbacks=True,
         weights=weights,
         safety_threshold=0.02,
@@ -141,9 +128,6 @@ if __name__ == "__main__":
         ee_pose = rdata.oMf[rmodel.getFrameId("panda_hand_tcp")]
         r[:] = xs[:rmodel.nq]
         input("Press Enter to continue to the next state...")
-    # for i, target in enumerate(traj_robot):
-        # scene.add_object(Object.create_sphere(radius=0.01, name=f'target_{i}', color=[1, 0, 0]))
-        # scene[f'target_{i}'].pos[:] = target.translation
     # Solve the OCP
     import time
     start_time = time.time()
