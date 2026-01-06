@@ -16,7 +16,7 @@ from robot_loader import load_reduced_panda, self_collision_pairs
 from ocp import OCP
 from parser_config import load_config
 from trajectory import se3_sinusoid_trajectory
-
+from trajectory_parser import TrajectoryParser
 
 if __name__ == "__main__":
     
@@ -30,10 +30,18 @@ if __name__ == "__main__":
     color = cfg["mesh"]["color"]
 
     safety_threshold = cfg["safety_threshold"]
-    T = cfg["T"]
+    # T = cfg["T"]
     dt = cfg["dt"]
 
+    T_camera = pin.SE3(np.eye(3), np.array([0.5, 0.0, 0.0]))
     
+    csv_path = Path("/home/arthur/Desktop/Projects/PAMI/object_following_ocp/ressources/exp_wildpose/howto100m_poses/howto100m_9Mh7jlESPvs_1-smoothed.csv")
+    parser = TrajectoryParser(csv_path, smooth_depth=True, smooth_k=2.0)
+    traj_camera = parser.get_camera_trajectory()
+
+    T_camera_robot = pin.SE3(np.eye(3), np.array([0.0, 0.0, 0.0]))  # Example transform
+    traj_robot = parser.to_robot_frame(T_camera_robot)
+        
     rmodel, cmodel, vmodel = load_reduced_panda()   
     for cp in self_collision_pairs:
         if cmodel.existGeometryName(cp[0]) and cmodel.existGeometryName(cp[1]):
@@ -68,22 +76,17 @@ if __name__ == "__main__":
     weights = cfg["weights"]
 
     
+    # for i, target in enumerate(traj_robot):
+    #     scene.add_object(Object.create_sphere(radius=0.01, name=f'target_{i}', color=[1, 0, 0]))
+    #     scene[f'target_{i}'].pos[:] = target.translation
+
     q0_0 = pin.randomConfiguration(rmodel)
     print("Initial configuration:", q0_0)
+    start_1 = traj_robot[0]
+    o.pose = ( start_1
+    ).homogeneous
     
-        
-    q0_1 = [-1.93027339 , 1.21002708, -0.27500036, -1.42079896,  0.08216306,  2.60651474,
-  0.16107337]
-
-    start_1 = pin.XYZQUATToSE3([-0.40169054, -0.5526958,  -0.11655478,  0.73505497, -0.66944448, -0.10450928,
-  0.02482115]
-    )
-    end_1 = pin.XYZQUATToSE3([0.5, -0.2, 0.5, 0.7071, 0.0, 0.7071, 0.0])
-    # start = pin.SE3(np.eye(3), np.array([0.5, 0.0, 0.5]))
-    # end = pin.SE3(np.eye(3), np.array([0.5, 0.2, 0.5]))
-    TARGET_POSES = se3_sinusoid_trajectory(start_1, end_1, T=50)
-    print(TARGET_POSES)
-    simple_ocp_creator = OCP(
+    OCP_creator_1 = OCP(
         rmodel,
         cmodel,
         start_1,
@@ -94,29 +97,28 @@ if __name__ == "__main__":
         with_callbacks=True,
         weights=weights,
         safety_threshold=0.02,
-        T=50,
-        dt=0.02,
+        T=len(traj_robot),
+        dt=dt,
     )
     
-    # simple_ocp = simple_ocp_creator.create_OCP()
-    # simple_ocp.solve()
-    # xs_init = simple_ocp.xs    
+    ocp_1 = OCP_creator_1.create_OCP()
+    X_init = [np.concatenate((q0_0, np.zeros(rmodel.nv)))] * (OCP_creator_1._T)
+    U_init = ocp_1.problem.quasiStatic(X_init[:-1])
+    ocp_1.solve(X_init, U_init)
+    
 
+    q0_1 = ocp_1.xs[-1][:rmodel.nq]
+    # end_1 = pin.XYZQUATToSE3([0.5, -0.2, 0.5, 0.7071, 0.0, 0.7071, 0.0])
+    # start = pin.SE3(np.eye(3), np.array([0.5, 0.0, 0.5]))
+    # end = pin.SE3(np.eye(3), np.array([0.5, 0.2, 0.5]))
+    # TARGET_POSES = se3_sinusoid_trajectory(start_1, end_1, T=50)
     
-    # while True:
-    #     q = pin.randomConfiguration(rmodel)
-    #     pin.framesForwardKinematics(rmodel, rdata, q)
-    #     ee_pos = rdata.oMf[rmodel.getFrameId("panda_hand_tcp")]
-    #     print("EE pos:", pin.SE3ToXYZQUAT(ee_pos))
-    #     print("q:", q)
-    #     viz.display(q)
-    #     input()
-    
+    # TARGET_POSES_world = TARGET_POSES.transform(T_camera)
     
     OCP_creator = OCP(
         rmodel,
         cmodel,
-        TARGET_POSES,
+        traj_robot,
         x0=np.concatenate((q0_1, np.zeros(rmodel.nv))),
         joint_limits=True,
         penalisation=False,
@@ -124,28 +126,33 @@ if __name__ == "__main__":
         with_callbacks=True,
         weights=weights,
         safety_threshold=0.02,
-        T=50,
-        dt=0.02,
+        T=len(traj_robot),
+        dt=dt,
     )
     ocp = OCP_creator.create_OCP()
     X_init = [np.concatenate((q0_1, np.zeros(rmodel.nv)))] * (OCP_creator._T)
     U_init = ocp.problem.quasiStatic(X_init[:-1])
     
-    for i, target in enumerate(TARGET_POSES):
-        scene.add_object(Object.create_sphere(radius=0.01, name=f'target_{i}', color=[1, 0, 0]))
-        scene[f'target_{i}'].pos[:] = target.translation
+    scene.add_object(Object.create_sphere(radius=0.01, name=f'camera', color=[1, 1, 0]))
+    scene["camera"].pos[:] = T_camera.translation
+    
+    for i, xs in enumerate(ocp_1.xs):
+        pin.framesForwardKinematics(rmodel, rdata, xs[:rmodel.nq])
+        ee_pose = rdata.oMf[rmodel.getFrameId("panda_hand_tcp")]
+        r[:] = xs[:rmodel.nq]
+        input("Press Enter to continue to the next state...")
+    # for i, target in enumerate(traj_robot):
+        # scene.add_object(Object.create_sphere(radius=0.01, name=f'target_{i}', color=[1, 0, 0]))
+        # scene[f'target_{i}'].pos[:] = target.translation
     # Solve the OCP
     import time
     start_time = time.time()
     ocp.solve(X_init, U_init)
     end_time = time.time()
     print(f"OCP solved in {end_time - start_time} seconds")
-    # Visualize the solution
-    # for i, xs in enumerate(xs_init):
-    #     r[:] = xs[:rmodel.nq]
-    #     input()
-    
-    for i, xs in enumerate(ocp.xs):
+    for i, (xs, target) in enumerate(zip(ocp.xs, traj_robot)):
+        scene.add_object(Object.create_sphere(radius=0.01, name=f'target_{i}', color=[1, 0, 0]))
+        scene[f'target_{i}'].pos[:] = target.translation
         pin.framesForwardKinematics(rmodel, rdata, xs[:rmodel.nq])
         ee_pose = rdata.oMf[rmodel.getFrameId("panda_hand_tcp")]
         r[:] = xs[:rmodel.nq]
