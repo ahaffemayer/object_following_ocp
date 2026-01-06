@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pinocchio as pin
 
+from trajectory import Trajectory
 
 class TrajectoryParser:
     """
@@ -71,20 +72,17 @@ class TrajectoryParser:
 
     # ---------- public API ----------
 
-    def get_camera_trajectory(self) -> list[pin.SE3]:
+    def get_camera_trajectory(self) -> Trajectory:
         """Object trajectory in CAMERA frame"""
-        return self._poses_camera
+        return Trajectory(self._poses_camera)
 
-    def to_robot_frame(self, robot_to_camera: pin.SE3) -> list[pin.SE3]:
+    def to_robot_frame(self, camera_to_robot: pin.SE3) -> Trajectory:
         """
         Converts trajectory to ROBOT / WORLD frame.
 
-        robot_to_camera: SE3(robot <- camera)
+        camera_to_robot: SE3(robot <- camera)
         """
-        return [
-            robot_to_camera * pose
-            for pose in self._poses_camera
-        ]
+        return Trajectory(self._poses_camera).transform(camera_to_robot)
 
     def get_metadata(self):
         return {
@@ -100,8 +98,8 @@ if __name__ == "__main__":
     parser = TrajectoryParser(csv_path, smooth_depth=True, smooth_k=2.0)
     traj_camera = parser.get_camera_trajectory()
 
-    T_robot_camera = pin.SE3(np.eye(3), np.array([0.5, 0.0, 1.0]))  # Example transform
-    traj_robot = parser.to_robot_frame(T_robot_camera)
+    T_camera_robot = pin.SE3(np.eye(3), np.array([0.5, 0.0, 1.0]))  # Example transform
+    traj_robot = parser.to_robot_frame(T_camera_robot)
 
     metadata = parser.get_metadata()
     print(metadata)
