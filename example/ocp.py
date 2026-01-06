@@ -18,8 +18,7 @@ class OCP:
         target_poses: pin.SE3 | Trajectory | list[pin.SE3],
         x0: np.ndarray,
         joint_limits: bool = False,
-        penalisation: bool = True,
-        constraint: bool = False,
+        joint_limits_constraint: bool = False,
         with_callbacks: bool = False,
         weights: dict = {},
         safety_threshold: float = 0.01,
@@ -39,8 +38,7 @@ class OCP:
         self._SAFETY_THRESHOLD = safety_threshold
 
         self._joints_limits = joint_limits
-        self._penalisation = penalisation
-        self._constraint = constraint
+        self._joint_limits_constraint = joint_limits_constraint
 
         # Weights
         self.weights = weights
@@ -158,17 +156,7 @@ class OCP:
                     self._state, self._x0, self._actuation.nu
                 )
 
-                if self._penalisation:
-                    bounds = crocoddyl.ActivationBounds(xlb, xub, 1.0)
-                    activation = crocoddyl.ActivationModelQuadraticBarrier(bounds)
-                    limitCost = crocoddyl.CostModelResidual(
-                        self._state, activation, xLimitResidual
-                    )
-                    runningCostModel.addCost(
-                        "limitCost", limitCost, self._WEIGHT_LIMIT
-                    )
-
-                elif self._constraint:
+                if self._joint_limits_constraint:
                     limitConstraint = crocoddyl.ConstraintModelResidual(
                         self._state,
                         xLimitResidual,
@@ -178,6 +166,16 @@ class OCP:
                     runningConstraintManager.addConstraint(
                         f"lim_{t}", limitConstraint
                     )
+                else:
+                    bounds = crocoddyl.ActivationBounds(xlb, xub, 1.0)
+                    activation = crocoddyl.ActivationModelQuadraticBarrier(bounds)
+                    limitCost = crocoddyl.CostModelResidual(
+                        self._state, activation, xLimitResidual
+                    )
+                    runningCostModel.addCost(
+                        "limitCost", limitCost, self._WEIGHT_LIMIT
+                    )
+
 
             # ---------- DYNAMICS ----------
             dam = crocoddyl.DifferentialActionModelFreeFwdDynamics(
