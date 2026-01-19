@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pinocchio as pin
 
-from trajectory import Trajectory
+from object_following_ocp.trajectory import Trajectory
 
 class TrajectoryParser:
     """

@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 import mim_solvers
 
-from trajectory import Trajectory
+from object_following_ocp.trajectory import Trajectory
 
 class OCP:
     """Optimal control problem for a Panda robot reaching a target, with collision avoidance"""
@@ -110,6 +110,11 @@ class OCP:
                 self._endeff_frame,
                 target,
             )
+            # frameResidual = crocoddyl.ResidualModelFrameTranslation(
+            #     self._state,
+            #     self._endeff_frame,
+            #     target.translation,
+            # )
             goalCost = crocoddyl.CostModelResidual(self._state, frameResidual)
 
             runningCostModel.addCost(
@@ -203,6 +208,11 @@ class OCP:
             self._endeff_frame,
             terminalTarget,
         )
+        # terminalResidual = crocoddyl.ResidualModelFrameTranslation(
+        #     self._state,
+        #     self._endeff_frame,
+        #     terminalTarget.translation,
+        # )
         terminalGoalCost = crocoddyl.CostModelResidual(
             self._state, terminalResidual
         )
@@ -238,7 +248,7 @@ class OCP:
 
         ocp.use_filter_line_search = False
         ocp.termination_tolerance = 1e-3
-        ocp.max_qp_iters = 25
+        ocp.max_qp_iters = 200
         ocp.eps_abs = 1e-6
         ocp.eps_rel = 0.0
         ocp.with_callbacks = self._with_callbacks

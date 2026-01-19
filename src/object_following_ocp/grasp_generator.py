@@ -12,9 +12,9 @@ import mim_solvers
 from pinocchio import visualize
 from robomeshcat import Scene, Object, Robot
 
-from robot_loader import load_reduced_panda, self_collision_pairs
-from ocp import OCP
-from parser_config import load_config
+from object_following_ocp.robot_loader import load_reduced_panda, self_collision_pairs
+from object_following_ocp.ocp import OCP
+from object_following_ocp.parser_config import load_config
 
 
 class GraspGenerator:
