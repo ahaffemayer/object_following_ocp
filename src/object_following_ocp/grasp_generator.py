@@ -114,11 +114,11 @@ class GraspGenerator:
     def _get_weights(self) -> dict:
         """Returns the weights for the IK problem."""
         return {
-            "W_xREG": 0.0000,
-            "W_uREG": 0.0000,
+            "W_xREG": 0.0001,
+            "W_uREG": 0.0001,
             "W_gripper_pose": 10.0,
             "W_gripper_pose_term": 100000.0,
-            "W_limit": 1000.0,
+            "W_limit": 0.0,
         }
 
     def _add_offest_to_pose(self, pose: pin.SE3) -> pin.SE3:
