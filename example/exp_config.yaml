@@ -1,0 +1,17 @@
+bowl1:
+name: "cbb0cdd9bbcc4fdfa2e16db1db4cda61"
+results: "results/bowl1/"
+scale: 0.1793
+
+bowl4_1:
+name: "52ebceafc8af4f2ab527e9a5a454998f"
+results: "results/bowl4_1/"
+
+bowl4_2:
+name: "501bfd01f7924647a56334c4ae922fbb"
+results: "results/bowl4_2/"
+
+campbells2:
+name: "102ae42bff9940fc8f0b12c8a53d2675"
+results: "results/campbells2/"
+scale: 0.0465
