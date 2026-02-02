@@ -11,15 +11,11 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "colmpc>=0.3.0",
-    "diffusers>=0.35.1",
-    "einops>=0.8.1",
     "matplotlib>=3.9.4",
     "meshcat>=0.3.2",
     "natsort>=8.4.0",
     "proxsuite!=0.7.2.post1",
-    "pytorch-lightning>=2.5.5",
-    "torch>=2.8.0",
-    "torchvision>=0.23.0",
+    "robomeshcat >=1.1.4"
 ]
 
 [[tool.uv.index]]
