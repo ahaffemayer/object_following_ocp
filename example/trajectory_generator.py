@@ -1,17 +1,21 @@
-import numpy as np
-from pathlib import Path
-import pinocchio as pin
-from robomeshcat import Scene, Object, Robot
 import time
-import yaml
+from pathlib import Path
 
+import numpy as np
+import pinocchio as pin
+import yaml
+from robomeshcat import Object, Robot, Scene
+
+from object_following_ocp.dataclass import ConfigLoader
 from object_following_ocp.grasp_generator import GraspGenerator
 from object_following_ocp.ocp import OCP
-from object_following_ocp.parser_config import load_config
 from object_following_ocp.robot_loader import load_reduced_panda, self_collision_pairs
-from object_following_ocp.trajectory_parser import TrajectoryParser
-from object_following_ocp.trajectory import Trajectory, TrajectoryInConfigurationSpace, TrajectoryEvaluator
-
+from object_following_ocp.trajectory import (
+    Trajectory,
+    TrajectoryEvaluator,
+    TrajectoryInConfigurationSpace,
+)
+from object_following_ocp.trajectory_parser import JSONTrajectoryParser
 
 vis_candidates = False  # set True to visualize all candidate trajectories
 vis_best_case = False  # set True to visualize only the best case found
@@ -21,6 +25,7 @@ vis_best_case = False  # set True to visualize only the best case found
 # -----------------------------
 
 CAMERA_YAW = 0.0  # Fixed yaw since diverse grasps already provide orientational variety
+
 
 def pose_distance_to_color(T_target, T_ee, d_min=0.05, d_max=0.2):
     """
@@ -51,6 +56,7 @@ def pose_distance_to_color(T_target, T_ee, d_min=0.05, d_max=0.2):
     b = 0.0
 
     return [r, g, b]
+
 
 def load_grasps_from_yaml(yaml_path, gripper_depth=0.1034):
     """
@@ -127,7 +133,7 @@ def sample_camera_translations_grid(
     nz=3,
     xlim=(-0.5, 0.1),
     ylim=(-0.5, 0.5),
-    zlim=(-0.5, 0.5),
+    zlim=(-0.0, 1.0),
 ):
     xs = np.linspace(xlim[0], xlim[1], nx)
     ys = np.linspace(ylim[0], ylim[1], ny)
@@ -146,9 +152,9 @@ def se3_from_translation_yaw(translation, yaw):
     return pin.SE3(R, translation)
 
 
-def camera_to_robot_trajectory(parser, camera_translation, yaw):
+def camera_to_robot_trajectory(parser, camera_translation, yaw, object_id=None):
     T_camera_robot = se3_from_translation_yaw(camera_translation, yaw)
-    return parser.to_robot_frame(T_camera_robot)
+    return parser.to_robot_frame(T_camera_robot, object_id=object_id)
 
 
 # -----------------------------
@@ -159,47 +165,43 @@ if __name__ == "__main__":
 
     tstart = time.time()
 
-    cfg = load_config(Path(__file__).parent / "config.yaml")
-    weights = cfg["weights"]
-    dt = cfg["dt"]
-    safety_threshold = cfg["safety_threshold"]
+    # Load robot configuration from YAML
+    robot_config = ConfigLoader.load(
+        Path(__file__).parent / "robot_config.yml")
 
-    mesh_dir = Path(cfg["mesh"]["path"])
-    obj_file = mesh_dir / cfg["mesh"]["obj_file"]
-    texture_file = mesh_dir / cfg["mesh"]["texture_file"]
-    scale = cfg["mesh"]["scale"]
-    color = cfg["mesh"]["color"]
-
-    gripper_depth = cfg["gripper_depth"]
-
-    csv_path = Path(
-        "/home/arthur/Desktop/Projects/PAMI/object_following_ocp/ressources/video_data/d02/jug/jug-obj_2-tracked-4.csv"
+    # Load trajectory data from JSON
+    json_path = Path(
+        "/workspaces/object_following_ocp/ressources/json/jug.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
     )
 
     # Path to graspgen output YAML file
     grasp_yaml_path = Path(
-        "/home/arthur/Desktop/Projects/PAMI/object_following_ocp/results/jug/jug_grasps_filtered.yml"
+        "/workspaces/object_following_ocp/results/jug/jug_grasps_filtered_new.yml"
     )
+
+    # -----------------------------
+    # Load trajectory parser
+    # -----------------------------
+
+    parser = JSONTrajectoryParser(json_path, smooth_depth=True, smooth_k=2.0)
+
+    # Get object information (auto-selects first available object)
+    object_info = parser.get_object_info(texture_name="material_0.png")
+
+    print(f"Object mesh: {object_info.mesh_path}")
+    print(f"Object scale: {object_info.scale}")
 
     # -----------------------------
     # Load grasp poses from graspgen
     # -----------------------------
 
     print("Loading grasp poses from graspgen...")
-
-    # Load grasp poses and convert to TCP frame
-    print("Loading grasp poses from graspgen...")
     grasps_object_frame = load_grasps_from_yaml(
-        grasp_yaml_path, gripper_depth=gripper_depth
+        grasp_yaml_path, gripper_depth=robot_config.gripper_depth
     )
     print(
         f"Loaded {len(grasps_object_frame)} diverse grasp poses (converted to TCP frame)"
     )
-    # -----------------------------
-    # Load trajectory parser
-    # -----------------------------
-
-    parser = TrajectoryParser(csv_path, smooth_depth=True, smooth_k=2.0)
 
     # -----------------------------
     # Load robot and collision model
@@ -233,23 +235,24 @@ if __name__ == "__main__":
 
     scene = Scene()
     scene.add_robot(robot)
+
     o = Object.create_mesh(
-        path_to_mesh=obj_file,
+        path_to_mesh=object_info.mesh_path,
         name="robot/movable_obj",
-        texture=texture_file,
-        scale=scale,
-        color=color,
+        texture=object_info.texture_path,
+        scale=object_info.scale,
+        color=[0.8, 0.8, 0.8],
     )
+    print(f"object_info.texture_path: {object_info.texture_path}")
     scene.add_object(o)
 
     o_EE = Object.create_mesh(
-        path_to_mesh=obj_file,
+        path_to_mesh=object_info.mesh_path,
         name="robot/movable_obj_ee",
-        # texture=texture_file,
-        scale=scale,
+        scale=object_info.scale,
+        texture=object_info.texture_path,
         color=(1.0, 0.0, 0.0),
     )
-    scene.add_object(o)
     scene.add_object(o_EE)
 
     # -----------------------------
@@ -262,7 +265,7 @@ if __name__ == "__main__":
         nz=3,
         xlim=(-0.3, 0.3),
         ylim=(-0.4, 0.4),
-        zlim=(-0.6, -1.0),
+        zlim=(-0.5, 0.0),
     )
     all_trajs_robot = []
     camera_configs = []  # list of translations
@@ -350,6 +353,15 @@ if __name__ == "__main__":
         traj_robot = case["traj_robot"]
         q0 = case["grasp"]
 
+        # Create weights dictionary from robot_config
+        weights = {
+            "W_xREG": robot_config.W_xREG,
+            "W_uREG": robot_config.W_uREG,
+            "W_gripper_pose": robot_config.W_gripper_pose,
+            "W_gripper_pose_term": robot_config.W_gripper_pose_term,
+            "W_limit": robot_config.W_limit,
+        }
+
         OCP_creator = OCP(
             rmodel,
             cmodel,
@@ -359,9 +371,9 @@ if __name__ == "__main__":
             joint_limits_constraint=False,
             with_callbacks=False,
             weights=weights,
-            safety_threshold=safety_threshold,
+            safety_threshold=robot_config.safety_threshold,
             T=len(traj_robot),
-            dt=dt,
+            dt=robot_config.dt,
         )
 
         ocp = OCP_creator.create_OCP()
@@ -417,7 +429,6 @@ if __name__ == "__main__":
         print(f"  Grasp index: {best_case['grasp_idx']}")
         print(f"  Position error: {best_error:.4f} m")
         print(f"  Camera translation: {best_case['camera_translation']}")
-        # print(f"  Camera yaw: {np.rad2deg(best_case['camera_yaw']):.1f} degrees")
     else:
         print("\nNo successful cases found!")
 
@@ -440,10 +451,12 @@ if __name__ == "__main__":
             ee_pose = rdata.oMf[ee_frame_id]
 
             scene.add_object(
-                Object.create_sphere(radius=0.01, name=f"ee_{k}", color=[0, 1, 0])
+                Object.create_sphere(
+                    radius=0.01, name=f"ee_{k}", color=[0, 1, 0])
             )
             scene.add_object(
-                Object.create_sphere(radius=0.01, name=f"target_{k}", color=[1, 0, 0])
+                Object.create_sphere(
+                    radius=0.01, name=f"target_{k}", color=[1, 0, 0])
             )
 
             scene[f"ee_{k}"].pos[:] = ee_pose.translation
@@ -495,8 +508,6 @@ if __name__ == "__main__":
                 )
                 o.pose = (target * T_offset).homogeneous
                 o_EE.pose = (ee_pose * T_offset).homogeneous
-
-                # o_EE.color = color
 
                 time.sleep(0.05)
 
