@@ -5,8 +5,6 @@ This directory contains configurations for developing the Object Following OCP p
 ## 📁 Files Included
 
 - **`devcontainer.json`**: Basic setup using Microsoft's Python base image
-- **`devcontainer-with-dockerfile.json`**: Alternative using custom Dockerfile (rename to `devcontainer.json` to use)
-- **`Dockerfile`**: Custom image with pre-installed system dependencies
 - **`setup.sh`**: Post-creation script that installs project dependencies with `uv`
 
 ## 🚀 Quick Start
@@ -43,12 +41,6 @@ The container is configured to support GUI applications (meshcat viewer, matplot
 - X11 socket is mounted from host
 - `DISPLAY` environment variable is forwarded
 - Network host mode for easy access to web-based visualizations
-
-### Using the Custom Dockerfile
-If you want more control or need to modify system dependencies:
-1. Rename `devcontainer-with-dockerfile.json` to `devcontainer.json`
-2. Edit `Dockerfile` as needed
-3. Rebuild the container
 
 ## 💡 Usage Tips
 
