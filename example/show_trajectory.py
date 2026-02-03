@@ -1,48 +1,47 @@
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 import pinocchio as pin
-from robomeshcat import Scene, Object, Robot
-import time
+from robomeshcat import Object, Robot, Scene
 
-from object_following_ocp.grasp_generator import GraspGenerator
-from object_following_ocp.ocp import OCP
-from object_following_ocp.parser_config import load_config
+from object_following_ocp.dataclass import ConfigLoader
 from object_following_ocp.robot_loader import load_reduced_panda, self_collision_pairs
-from object_following_ocp.trajectory_parser import TrajectoryParser
-from object_following_ocp.trajectory import Trajectory, TrajectoryInConfigurationSpace, TrajectoryEvaluator
-
+from object_following_ocp.trajectory_parser import JSONTrajectoryParser
 
 # -----------------------------
 # Main
 # -----------------------------
-
 if __name__ == "__main__":
+    # Load robot configuration from YAML
+    robot_config = ConfigLoader.load(
+        Path(__file__).parent / "robot_config.yml")
 
-    tstart = time.time()
+    # Load trajectory data from JSON
+    json_path = Path(
+        "/workspaces/object_following_ocp/ressources/json/jug.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json")
 
-    cfg = load_config(Path(__file__).parent / "config.yaml")
-    weights = cfg["weights"]
-    dt = cfg["dt"]
-    safety_threshold = cfg["safety_threshold"]
+    # Parser automatically resolves mesh paths and applies smoothing
+    traj_parser = JSONTrajectoryParser(
+        json_path, smooth_depth=True, smooth_k=2.0)
 
-    mesh_dir = Path(cfg["mesh"]["path"])
-    obj_file = mesh_dir / cfg["mesh"]["obj_file"]
-    texture_file = mesh_dir / cfg["mesh"]["texture_file"]
-    scale = cfg["mesh"]["scale"]
-    color = cfg["mesh"]["color"]
+    # Show available objects
+    print("Available objects:", traj_parser.get_available_objects())
 
-    csv_path = Path("/home/arthur/Desktop/Projects/PAMI/object_following_ocp/ressources/video_data/d02/campbells2/campbells2-obj_0-tracked-0.csv")
+    # Get object information (auto-selects first available object)
+    object_info = traj_parser.get_object_info(texture_name="material_0.png")
 
-    # -----------------------------
-    # Load trajectory parser
-    # -----------------------------
+    print(f"Object mesh: {object_info.mesh_path}")
+    print(f"Object texture: {object_info.texture_path}")
+    print(f"Object scale: {object_info.scale}")
 
-    parser = TrajectoryParser(csv_path, smooth_depth=True, smooth_k=2.0)
+    # Get trajectory poses (auto-selects first available object)
+    trajectory = traj_parser.get_poses_for_object()
+
+    print(f"Number of poses: {len(trajectory)}")
 
     # -----------------------------
     # Load robot and collision model
     # -----------------------------
-
     rmodel, cmodel, vmodel = load_reduced_panda()
 
     for cp in self_collision_pairs:
@@ -68,28 +67,38 @@ if __name__ == "__main__":
     # -----------------------------
     # Scene
     # -----------------------------
-
     scene = Scene()
     scene.add_robot(robot)
 
     # -----------------------------
-    # Add object to scene
+    # Add object to scene (using paths from parser)
     # -----------------------------
-    
     o = Object.create_mesh(
-        path_to_mesh=obj_file,
+        path_to_mesh=object_info.mesh_path,
         name="robot/movable_obj",
-        texture=texture_file,
-        scale=scale,
-        color=color,  
+        texture=object_info.texture_path,
+        scale=object_info.scale,
+        color=[0.8, 0.8, 0.8],
     )
     scene.add_object(o)
-    for k, pose in enumerate(parser.get_camera_trajectory()):
-        color = [0.0, 1.0, 0.0] if k == 0 else [0.5, 0.5, 0.5]            
+
+    # -----------------------------
+    # Visualize trajectory
+    # -----------------------------
+    for k, pose_data in enumerate(trajectory):
+        color = [0.0, 1.0, 0.0] if k == 0 else [0.5, 0.5, 0.5]
+
         scene.add_object(
             Object.create_sphere(radius=0.01, name=f"target_{k}", color=color)
-        )        
-        scene[f"target_{k}"].pos[:] = pose.translation
-        o.pose = pose.homogeneous
+        )
+
+        # Create homogeneous transformation matrix from R and t
+        pose_matrix = np.eye(4)
+        pose_matrix[:3, :3] = pose_data.R
+        pose_matrix[:3, 3] = pose_data.t
+
+        scene[f"target_{k}"].pos[:] = pose_data.t
+        o.pose = pose_matrix
+
+        print(f"Pose {k}: im_id={pose_data.im_id}, score={pose_data.score:.3f}")
         input("Press Enter to continue to the next target...")
-    
