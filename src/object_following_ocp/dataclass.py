@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass
-from typing import Dict, List
+from pathlib import Path
+from typing import Dict, List, Optional
 
 import numpy as np
 import yaml
@@ -25,6 +26,8 @@ class ObjectInfo:
     mesh_id: str
     score: float
     scale: float
+    mesh_path: Path
+    texture_path: Optional[Path] = None
 
 
 @dataclass
@@ -42,17 +45,60 @@ class PoseData:
 class TrajectoryParser:
     """Parse object tracking JSON file"""
 
-    def __init__(self, json_path: str):
-        with open(json_path, 'r') as f:
+    def __init__(self, json_path: str | Path, mesh_base_dir: Optional[str | Path] = None):
+        """
+        Initialize trajectory parser
+
+        Args:
+            json_path: Path to JSON file containing trajectory data
+            mesh_base_dir: Base directory for meshes. If None, uses ../meshes relative to json_path
+        """
+        self.json_path = Path(json_path)
+
+        with open(self.json_path, 'r') as f:
             self.data = json.load(f)
 
-    def get_object_info(self, object_id: int) -> ObjectInfo:
-        """Extract object information"""
+        # Set mesh base directory
+        if mesh_base_dir is None:
+            self.mesh_base_dir = self.json_path.parent.parent / "meshes"
+        else:
+            self.mesh_base_dir = Path(mesh_base_dir)
+
+    def get_object_info(self, object_id: int, texture_name: str = "material_0.png") -> ObjectInfo:
+        """
+        Extract object information including mesh paths
+
+        Args:
+            object_id: ID of the object
+            texture_name: Name of texture file (default: material_0.png)
+
+        Returns:
+            ObjectInfo with mesh and texture paths resolved
+        """
         obj_data = self.data['objects'][str(object_id)]
+        mesh_id = obj_data['mesh']
+
+        # Construct mesh path: ../meshes/{mesh_name}/{mesh_name}.obj
+        mesh_dir = self.mesh_base_dir / mesh_id
+        mesh_path = mesh_dir / f"{mesh_id}.obj"
+
+        # Construct texture path
+        texture_path = mesh_dir / texture_name if texture_name else None
+
+        # Verify paths exist
+        if not mesh_path.exists():
+            raise FileNotFoundError(f"Mesh file not found: {mesh_path}")
+
+        if texture_path and not texture_path.exists():
+            print(f"Warning: Texture file not found: {texture_path}")
+            texture_path = None
+
         return ObjectInfo(
-            mesh_id=obj_data['mesh'],
+            mesh_id=mesh_id,
             score=obj_data['score'],
-            scale=obj_data['scale']
+            scale=obj_data['scale'],
+            mesh_path=mesh_path,
+            texture_path=texture_path
         )
 
     def get_trajectory(self) -> List[PoseData]:
@@ -74,6 +120,13 @@ class TrajectoryParser:
         """Get trajectory for specific object"""
         trajectory = self.get_trajectory()
         return [pose for pose in trajectory if pose.object_id == object_id]
+
+    def get_available_objects(self) -> Dict[int, str]:
+        """Get dictionary of available object IDs and their mesh IDs"""
+        return {
+            int(obj_id): obj_data['mesh']
+            for obj_id, obj_data in self.data['objects'].items()
+        }
 
 
 class ConfigLoader:
