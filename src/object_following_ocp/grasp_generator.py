@@ -1,155 +1,245 @@
-import meshcat
-import numpy as np
-from pathlib import Path
-import pinocchio as pin
-import sys
+import logging
+import time
 from typing import Any
+
 import numpy as np
-import colmpc as col
-import crocoddyl
 import pinocchio as pin
-import mim_solvers
-from pinocchio import visualize
-from robomeshcat import Scene, Object, Robot
 
-from object_following_ocp.robot_loader import load_reduced_panda, self_collision_pairs
 from object_following_ocp.ocp import OCP
-from object_following_ocp.parser_config import load_config
+from object_following_ocp.robot_loader import self_collision_pairs
 
+# ------------------------------------------------------------------------------
+# Logging configuration, call ONCE from the application
+# ------------------------------------------------------------------------------
+
+
+def configure_logging(verbose: bool) -> None:
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.WARNING,
+        format="[%(levelname)s] %(name)s: %(message)s",
+        force=True,
+    )
+
+
+# ------------------------------------------------------------------------------
+# Grasp generator
+# ------------------------------------------------------------------------------
 
 class GraspGenerator:
     """Generates grasp configurations for a given object pose."""
 
     def __init__(
         self,
+        rmodel,
+        cmodel,
         obj_pose: pin.SE3,
         grasp_configurations_number: int,
         max_attempts: int = 100,
-        offset: np.ndarray = np.array([0.0, 0.0, 0.0]),
+        offset: np.ndarray = np.zeros(3),
+        ee_frame: str = "panda_hand_tcp",
     ):
+        self.logger = logging.getLogger("GraspGenerator")
+
         self._obj_pose = obj_pose
         self._grasp_configurations_number = grasp_configurations_number
         self._max_attempts = max_attempts
         self._offset = offset
-        self._offested_obj_pose = self._add_offest_to_pose(self._obj_pose)
+        self._ee_frame = ee_frame
 
-        # Create the robot model
-        self.rmodel, self.cmodel, self.vmodel = load_reduced_panda()
-        for cp in self_collision_pairs:
-            if self.cmodel.existGeometryName(cp[0]) and self.cmodel.existGeometryName(
-                cp[1]
+        self.rmodel = rmodel
+        self.cmodel = cmodel
+
+        # Add self-collision pairs
+        for name1, name2 in self_collision_pairs:
+            if (
+                self.cmodel.existGeometryName(name1)
+                and self.cmodel.existGeometryName(name2)
             ):
                 self.cmodel.addCollisionPair(
                     pin.CollisionPair(
-                        self.cmodel.getGeometryId(cp[0]),
-                        self.cmodel.getGeometryId(cp[1]),
+                        self.cmodel.getGeometryId(name1),
+                        self.cmodel.getGeometryId(name2),
                     )
                 )
+
         self.rdata = self.rmodel.createData()
         self.cdata = self.cmodel.createData()
 
-    def generate_grasps_configurations(self) -> list[np.ndarray]:
-        """Generates a list of grasp configurations around the object pose."""
-        grasps = []
-        attempts = 0
-        while (
-            attempts < self._max_attempts
-            and len(grasps) < self._grasp_configurations_number
-        ):
+        self._target_pose = self._apply_offset(self._obj_pose)
 
-            # Generate a random collision-free configuration
+        self.logger.debug("Initialized GraspGenerator")
+
+    # --------------------------------------------------------------------------
+
+    def generate_grasp_configurations(self) -> list[np.ndarray]:
+        grasps: list[np.ndarray] = []
+        attempts = 0
+
+        self.logger.debug(
+            "Starting grasp generation, target=%d, max_attempts=%d",
+            self._grasp_configurations_number,
+            self._max_attempts,
+        )
+
+        t_global = time.perf_counter()
+
+        while attempts < self._max_attempts and len(grasps) < self._grasp_configurations_number:
+            attempts += 1
+            self.logger.debug("Attempt %d", attempts)
+
+            # ------------------------------------------------------------------
+            # Sampling
+            # ------------------------------------------------------------------
             try:
-                q_random = self._get_random_collision_free_configuration()
+                t0 = time.perf_counter()
+                q0 = self._sample_collision_free_configuration()
+                self.logger.debug(
+                    "Sampling took %.3f ms",
+                    1e3 * (time.perf_counter() - t0),
+                )
             except RuntimeError:
-                attempts += 1
+                self.logger.debug("Sampling failed")
                 continue
 
-            # Create an IK problem for the grasping task
-            ik_ocp = self._create_IK_problem(q_random)
+            # ------------------------------------------------------------------
+            # OCP creation
+            # ------------------------------------------------------------------
+            t0 = time.perf_counter()
+            ik = self._create_ik_ocp(q0)
+            self.logger.debug(
+                "OCP creation took %.3f ms",
+                1e3 * (time.perf_counter() - t0),
+            )
 
-            # Solve the IK problem
-            ik_ocp.solve()
-            q_sol = ik_ocp.xs[-1][: self.rmodel.nq]
-            # if the solution is valid and collision-free, add it to the list
-            if self._check_grasp_validity(q_sol):
+            # ------------------------------------------------------------------
+            # Solve
+            # ------------------------------------------------------------------
+            t0 = time.perf_counter()
+            ik.solve()
+            solve_time = time.perf_counter() - t0
+            self.logger.debug("IK solve took %.3f ms", 1e3 * solve_time)
+
+            q_sol = ik.xs[-1][: self.rmodel.nq]
+
+            # ------------------------------------------------------------------
+            # Validation
+            # ------------------------------------------------------------------
+            t0 = time.perf_counter()
+            if self._is_grasp_valid(q_sol):
                 grasps.append(q_sol)
-            attempts += 1
+                self.logger.debug(
+                    "Valid grasp %d / %d",
+                    len(grasps),
+                    self._grasp_configurations_number,
+                )
+
+            self.logger.debug(
+                "Validation took %.3f ms",
+                1e3 * (time.perf_counter() - t0),
+            )
+
+        self.logger.debug(
+            "Finished grasp generation in %.3f s, attempts=%d, grasps=%d",
+            time.perf_counter() - t_global,
+            attempts,
+            len(grasps),
+        )
 
         return grasps
 
-    def _create_IK_problem(self, q0: np.ndarray) -> OCP:
-        """Creates an IK problem for the grasping task."""
+    # --------------------------------------------------------------------------
 
-        weights = self._get_weights()
-        ik_ocp = OCP(
+    def _create_ik_ocp(self, q0: np.ndarray):
+        x0 = np.concatenate([q0, np.zeros(self.rmodel.nv)])
+
+        ocp = OCP(
             rmodel=self.rmodel,
             cmodel=self.cmodel,
-            target_poses=self._offested_obj_pose,
-            x0=np.concatenate((q0, np.zeros(self.rmodel.nv))),
+            target_poses=self._target_pose,
+            x0=x0,
             joint_limits=True,
             joint_limits_constraint=False,
             with_callbacks=False,
-            weights=weights,
+            weights=self._weights(),
             safety_threshold=0.01,
             T=3,
             dt=0.02,
+            ee_frame=self._ee_frame,
         )
-        ik = ik_ocp.create_OCP()
-        return ik
+        return ocp.create_OCP()
 
-    def _get_random_collision_free_configuration(self) -> np.ndarray:
-        """Generates a random collision-free configuration for the robot."""
+    # --------------------------------------------------------------------------
+
+    def _sample_collision_free_configuration(self) -> np.ndarray:
         max_trials = 1000
-        for _ in range(max_trials):
-            q_random = pin.randomConfiguration(self.rmodel)
-            pin.framesForwardKinematics(self.rmodel, self.rdata, q_random)
+        t0 = time.perf_counter()
+
+        for i in range(max_trials):
+            q = pin.randomConfiguration(self.rmodel)
+
+            pin.framesForwardKinematics(self.rmodel, self.rdata, q)
             pin.updateGeometryPlacements(
                 self.rmodel, self.rdata, self.cmodel, self.cdata
             )
-            collisions = pin.computeCollisions(self.cmodel, self.cdata, True)
-            if not collisions:
-                return q_random
-        raise RuntimeError("Failed to find a collision-free configuration.")
 
-    def _get_weights(self) -> dict:
-        """Returns the weights for the IK problem."""
+            if not pin.computeCollisions(self.cmodel, self.cdata, True):
+                self.logger.debug(
+                    "Collision-free after %d trials in %.3f ms",
+                    i + 1,
+                    1e3 * (time.perf_counter() - t0),
+                )
+                return q
+
+        raise RuntimeError("Collision-free sampling failed")
+
+    # --------------------------------------------------------------------------
+
+    def _is_grasp_valid(self, q: np.ndarray) -> bool:
+        pin.framesForwardKinematics(self.rmodel, self.rdata, q)
+        pin.updateGeometryPlacements(
+            self.rmodel, self.rdata, self.cmodel, self.cdata
+        )
+
+        if pin.computeCollisions(self.cmodel, self.cdata, True):
+            self.logger.debug("Rejected due to collision")
+            return False
+
+        ee_id = self.rmodel.getFrameId(self._ee_frame)
+        ee_pose = self.rdata.oMf[ee_id]
+
+        dist = np.linalg.norm(pin.log6(ee_pose.inverse() * self._obj_pose))
+        self.logger.debug("EE distance %.4f", dist)
+
+        return dist < 0.05
+
+    # --------------------------------------------------------------------------
+
+    def _apply_offset(self, pose: pin.SE3) -> pin.SE3:
+        out = pose.copy()
+        out.translation = out.translation + self._offset
+        return out
+
+    # --------------------------------------------------------------------------
+
+    @staticmethod
+    def _weights() -> dict[str, float]:
         return {
-            "W_xREG": 0.0001,
-            "W_uREG": 0.0001,
+            "W_xREG": 1e-4,
+            "W_uREG": 1e-4,
             "W_gripper_pose": 10.0,
-            "W_gripper_pose_term": 100000.0,
+            "W_gripper_pose_term": 1e5,
             "W_limit": 0.0,
         }
 
-    def _add_offest_to_pose(self, pose: pin.SE3) -> pin.SE3:
-        """Adds an offset to a given pose."""
-        new_translation = pose.translation + self._offset
-        # return pin.SE3(pose.rotation, new_translation)
-        return pose
+    # --------------------------------------------------------------------------
 
-    def _check_grasp_validity(self, q: np.ndarray) -> bool:
-        """Checks if a given grasp configuration is valid (collision-free)."""
-        pin.framesForwardKinematics(self.rmodel, self.rdata, q)
-        pin.updateGeometryPlacements(self.rmodel, self.rdata, self.cmodel, self.cdata)
-        collisions = pin.computeCollisions(self.cmodel, self.cdata, True)
-        if not collisions:
-            # See if the end-effector is close enough to the object pose
-            ee_frame_id = self.rmodel.getFrameId("panda_hand_tcp")
-            ee_pose = self.rdata.oMf[ee_frame_id]
-            distance = np.linalg.norm(pin.log6(ee_pose.inverse() * self._obj_pose))
-            if distance < 0.05:  # 5 cm threshold
-                return True
-        return False
-
+    @staticmethod
     def select_best_grasp(
-        self, grasps: list[np.ndarray], reference_configuration: np.ndarray
-    ) -> np.ndarray:
-        """Selects the best grasp configuration based on proximity to a reference configuration."""
-        best_grasp = None
-        best_distance = float("inf")
-        for q in grasps:
-            distance = np.linalg.norm(q - reference_configuration)
-            if distance < best_distance:
-                best_distance = distance
-                best_grasp = q
-        return best_grasp
+        grasps: list[np.ndarray],
+        reference_configuration: np.ndarray,
+    ) -> np.ndarray | None:
+        if not grasps:
+            return None
+
+        dists = [np.linalg.norm(q - reference_configuration) for q in grasps]
+        return grasps[int(np.argmin(dists))]

@@ -24,10 +24,12 @@ self_collision_pairs = [
     ("panda_link0_capsule_0", "panda_link7_capsule_0")
 ]
 
+
 def load_panda():
     panda = robex.load("panda_collision")
     rmodel, cmodel, vmodel = panda.model, panda.collision_model, panda.visual_model
     return rmodel, cmodel, vmodel
+
 
 def load_reduced_panda():
     rmodel, cmodel, vmodel = load_panda()
@@ -36,8 +38,43 @@ def load_reduced_panda():
         rmodel,
         list_of_geom_models=geom_models,
         list_of_joints_to_lock=[8, 9],
-        reference_configuration=np.array([-0.6513877410293797, 1.3677075286603906, -0.17736737718858037, -0.3973375018143172, -0.11554961778792178, 1.2408486160482337, 8.644879755868687e-05, 0.01, 0.02])
+        reference_configuration=np.array([-0.6513877410293797, 1.3677075286603906, -0.17736737718858037, -
+                                         0.3973375018143172, -0.11554961778792178, 1.2408486160482337, 8.644879755868687e-05, 0.04, 0.05])
     )
-    
+
     vmodel, cmodel = geometric_models_reduced[0], geometric_models_reduced[1]
+    return rmodel, cmodel, vmodel
+
+
+def load_ur5():
+    robot = robex.load("ur5")
+    rmodel, cmodel, vmodel = robot.model, robot.collision_model, robot.visual_model
+    return rmodel, cmodel, vmodel
+
+
+def load_talos_arm():
+    robot = robex.load("talos_arm")
+    rmodel, cmodel, vmodel = robot.model, robot.collision_model, robot.visual_model
+    return rmodel, cmodel, vmodel
+
+
+def load_kinova():
+    robot = robex.load("kinova")
+    rmodel, cmodel, vmodel = robot.model, robot.collision_model, robot.visual_model
+    return rmodel, cmodel, vmodel
+
+
+def load_talos():
+    robot = robex.load("talos")
+    rmodel, cmodel, vmodel = robot.model, robot.collision_model, robot.visual_model
+    # geom_models = [vmodel, cmodel]
+    # rmodel, geometric_models_reduced = pin.buildReducedModel(
+    #     rmodel,
+    #     list_of_geom_models=geom_models,
+    #     # list_of_joints_to_lock=[8, 9],
+    #     #                                0.3973375018143172, -0.11554961778792178, 1.2408486160482337, 8.644879755868687e-05, 0.04, 0.05])
+    # )
+
+    # vmodel, cmodel = geometric_models_reduced[0], geometric_models_reduced[1]
+    print(rmodel)
     return rmodel, cmodel, vmodel

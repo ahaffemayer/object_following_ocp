@@ -9,7 +9,7 @@ class Trajectory:
 
     def transform(self, T: pin.SE3) -> "Trajectory":
         return Trajectory([T * p for p in self.poses])
-    
+
     def __getitem__(self, index: int) -> pin.SE3:
         return self.poses[index]
 
@@ -27,29 +27,31 @@ class TrajectoryInConfigurationSpace:
 
     def __len__(self) -> int:
         return self.T
-    
-    def get_EE_poses(self, rmodel: pin.Model) -> list[pin.SE3]:
+
+    def get_EE_poses(self, rmodel: pin.Model, ee_frame: str = "panda_hand_tcp") -> list[pin.SE3]:
         poses = []
         rdata = rmodel.createData()
         for q in self.configurations:
             pin.forwardKinematics(rmodel, rdata, q)
             pin.updateFramePlacements(rmodel, rdata)
-            ee_frame_id = rmodel.getFrameId("panda_hand_tcp")
+            ee_frame_id = rmodel.getFrameId(ee_frame)
             ee_pose = rmodel.frames[ee_frame_id].placement
             poses.append(ee_pose)
         return poses
 
 
 class TrajectoryEvaluator:
-    def __init__(self, trajectory: Trajectory, traj_in_configuration_space: TrajectoryInConfigurationSpace, rmodel: pin.Model) -> None:
+    def __init__(self, trajectory: Trajectory, traj_in_configuration_space: TrajectoryInConfigurationSpace, rmodel: pin.Model, ee_frame: str = "panda_hand_tcp") -> None:
         self.trajectory = trajectory
         self.traj_in_configuration_space = traj_in_configuration_space
         self.rmodel = rmodel
         self.T = trajectory.T
-    
+        self.ee_frame = ee_frame
+
     def evaluate_position_error(self) -> float:
         error = 0.0
-        ee_poses = self.traj_in_configuration_space.get_EE_poses(self.rmodel)
+        ee_poses = self.traj_in_configuration_space.get_EE_poses(
+            self.rmodel, ee_frame=self.ee_frame)
         for k in range(self.T):
             p_desired = self.trajectory[k].translation
             p_actual = ee_poses[k].translation

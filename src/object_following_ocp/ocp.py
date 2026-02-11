@@ -1,12 +1,14 @@
-import pinocchio as pin
-import crocoddyl
-import colmpc as col
 import sys
 from typing import Any
-import numpy as np
+
+import colmpc as col
+import crocoddyl
 import mim_solvers
+import numpy as np
+import pinocchio as pin
 
 from object_following_ocp.trajectory import Trajectory
+
 
 class OCP:
     """Optimal control problem for a Panda robot reaching a target, with collision avoidance"""
@@ -24,6 +26,7 @@ class OCP:
         safety_threshold: float = 0.01,
         T: int = 50,
         dt: float = 0.02,
+        ee_frame: str = "panda_hand_tcp"
     ) -> None:
 
         # Robot models
@@ -56,8 +59,8 @@ class OCP:
         self._cdata = cmodel.createData()
 
         # End-effector frame
-        self._endeff_frame = self._rmodel.getFrameId("panda_hand_tcp")
-        assert self._endeff_frame < len(self._rmodel.frames)
+        self._endeff_frame_id = self._rmodel.getFrameId(ee_frame)
+        assert self._endeff_frame_id < len(self._rmodel.frames)
 
     def _process_targets(self, target_poses):
         if isinstance(target_poses, pin.SE3):
@@ -69,14 +72,14 @@ class OCP:
                     f"Expected at least {self._T} target poses, got {len(target_poses)}"
                 )
             return list(target_poses)
-        
+
         if isinstance(target_poses, Trajectory):
             if len(target_poses) < self._T:
                 raise ValueError(
                     f"Expected at least {self._T} target poses, got {len(target_poses)}"
                 )
             return list(target_poses.poses)
-        
+
         raise TypeError(
             "target_poses must be pin.SE3 or list[pin.SE3]"
         )
@@ -105,16 +108,16 @@ class OCP:
             runningCostModel.addCost("ctrlReg", uRegCost, self._WEIGHT_uREG)
 
             target = self._TARGET_POSES[t]
-            frameResidual = crocoddyl.ResidualModelFramePlacement(
-                self._state,
-                self._endeff_frame,
-                target,
-            )
-            # frameResidual = crocoddyl.ResidualModelFrameTranslation(
+            # frameResidual = crocoddyl.ResidualModelFramePlacement(
             #     self._state,
-            #     self._endeff_frame,
-            #     target.translation,
+            #     self._endeff_frame_id,
+            #     target,
             # )
+            frameResidual = crocoddyl.ResidualModelFrameTranslation(
+                self._state,
+                self._endeff_frame_id,
+                target.translation,
+            )
             goalCost = crocoddyl.CostModelResidual(self._state, frameResidual)
 
             runningCostModel.addCost(
@@ -173,14 +176,14 @@ class OCP:
                     )
                 else:
                     bounds = crocoddyl.ActivationBounds(xlb, xub, 1.0)
-                    activation = crocoddyl.ActivationModelQuadraticBarrier(bounds)
+                    activation = crocoddyl.ActivationModelQuadraticBarrier(
+                        bounds)
                     limitCost = crocoddyl.CostModelResidual(
                         self._state, activation, xLimitResidual
                     )
                     runningCostModel.addCost(
                         "limitCost", limitCost, self._WEIGHT_LIMIT
                     )
-
 
             # ---------- DYNAMICS ----------
             dam = crocoddyl.DifferentialActionModelFreeFwdDynamics(
@@ -191,9 +194,9 @@ class OCP:
             )
 
             iam = crocoddyl.IntegratedActionModelEuler(dam, self._dt)
-            iam.differential.armature = np.array(
-                [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0]
-            )
+            iam.differential.armature = np.array(self._rmodel.nq *
+                                                 [0.1]
+                                                 )
 
             running_models.append(iam)
 
@@ -203,16 +206,16 @@ class OCP:
         terminalCostModel.addCost("stateReg", xRegCost, self._WEIGHT_xREG)
 
         terminalTarget = self._TARGET_POSES[-1]
-        terminalResidual = crocoddyl.ResidualModelFramePlacement(
-            self._state,
-            self._endeff_frame,
-            terminalTarget,
-        )
-        # terminalResidual = crocoddyl.ResidualModelFrameTranslation(
+        # terminalResidual = crocoddyl.ResidualModelFramePlacement(
         #     self._state,
-        #     self._endeff_frame,
-        #     terminalTarget.translation,
+        #     self._endeff_frame_id,
+        #     terminalTarget,
         # )
+        terminalResidual = crocoddyl.ResidualModelFrameTranslation(
+            self._state,
+            self._endeff_frame_id,
+            terminalTarget.translation,
+        )
         terminalGoalCost = crocoddyl.CostModelResidual(
             self._state, terminalResidual
         )
@@ -235,9 +238,9 @@ class OCP:
         terminalModel = crocoddyl.IntegratedActionModelEuler(
             terminalDAM, 0.0
         )
-        terminalModel.differential.armature = np.array(
-            [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0]
-        )
+        terminalModel.differential.armature = np.array(self._rmodel.nq *
+                                                       [0.1]
+                                                       )
 
         # ---------- PROBLEM + SOLVER ----------
         problem = crocoddyl.ShootingProblem(
@@ -245,12 +248,12 @@ class OCP:
         )
 
         ocp = mim_solvers.SolverCSQP(problem)
-
+        # ocp = crocoddyl.SolverFDDP(problem)
         ocp.use_filter_line_search = False
         ocp.termination_tolerance = 1e-3
-        ocp.max_qp_iters = 200
+        ocp.max_qp_iters = 1000
         ocp.eps_abs = 1e-6
         ocp.eps_rel = 0.0
         ocp.with_callbacks = self._with_callbacks
-
+        # ocp.setCallbacks([crocoddyl.CallbackVerbose()])
         return ocp

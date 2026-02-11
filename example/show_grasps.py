@@ -3,7 +3,6 @@ import meshcat.geometry as g
 import meshcat.transformations as mtf
 import numpy as np
 import trimesh
-import trimesh.transformations as tra
 import yaml
 
 # ============================================================

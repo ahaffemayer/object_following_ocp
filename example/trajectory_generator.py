@@ -1,4 +1,6 @@
+import json
 import time
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -7,9 +9,14 @@ import yaml
 from robomeshcat import Object, Robot, Scene
 
 from object_following_ocp.dataclass import ConfigLoader
-from object_following_ocp.grasp_generator import GraspGenerator
+from object_following_ocp.grasp_generator import GraspGenerator, configure_logging
 from object_following_ocp.ocp import OCP
-from object_following_ocp.robot_loader import load_reduced_panda, self_collision_pairs
+from object_following_ocp.robot_loader import (
+    load_reduced_panda,
+    load_talos_arm,
+    load_ur5,
+    self_collision_pairs,
+)
 from object_following_ocp.trajectory import (
     Trajectory,
     TrajectoryEvaluator,
@@ -19,12 +26,31 @@ from object_following_ocp.trajectory_parser import JSONTrajectoryParser
 
 vis_candidates = False  # set True to visualize all candidate trajectories
 vis_best_case = False  # set True to visualize only the best case found
+verbose = False
+rob = "panda"
 
+
+configure_logging(verbose=False)  # or True
 # -----------------------------
 # Utilities
 # -----------------------------
 
 CAMERA_YAW = 0.0  # Fixed yaw since diverse grasps already provide orientational variety
+
+
+def se3_to_dict(T: pin.SE3):
+    return {
+        "rotation": T.rotation.tolist(),
+        "translation": T.translation.tolist(),
+    }
+
+
+def trajectory_se3_to_list(traj):
+    return [se3_to_dict(T) for T in traj]
+
+
+def joint_trajectory_to_list(xs, nq):
+    return [x[:nq].tolist() for x in xs]
 
 
 def pose_distance_to_color(T_target, T_ee, d_min=0.05, d_max=0.2):
@@ -207,17 +233,23 @@ if __name__ == "__main__":
     # Load robot and collision model
     # -----------------------------
 
-    rmodel, cmodel, vmodel = load_reduced_panda()
-
-    for cp in self_collision_pairs:
-        if cmodel.existGeometryName(cp[0]) and cmodel.existGeometryName(cp[1]):
-            cmodel.addCollisionPair(
-                pin.CollisionPair(
-                    cmodel.getGeometryId(cp[0]),
-                    cmodel.getGeometryId(cp[1]),
+    if rob == "panda":
+        rmodel, cmodel, vmodel = load_reduced_panda()
+        for cp in self_collision_pairs:
+            if cmodel.existGeometryName(cp[0]) and cmodel.existGeometryName(cp[1]):
+                cmodel.addCollisionPair(
+                    pin.CollisionPair(
+                        cmodel.getGeometryId(cp[0]),
+                        cmodel.getGeometryId(cp[1]),
+                    )
                 )
-            )
-
+        ee_frame = "panda_hand_tcp"
+    elif rob == "ur":
+        rmodel, cmodel, vmodel = load_ur5()
+        ee_frame = "ee_link"
+    elif rob == "talos_arm":
+        rmodel, cmodel, vmodel = load_talos_arm()
+        ee_frame = "wrist_left_tool_joint"
     rdata = rmodel.createData()
     cdata = cmodel.createData()
     vdata = vmodel.createData()
@@ -235,11 +267,13 @@ if __name__ == "__main__":
 
     scene = Scene()
     scene.add_robot(robot)
-
+    # scene.set_background_color(
+    # top_color=[0.2, 0.4, 0.8], bottom_color=[0.2, 0.4, 0.8])
     o = Object.create_mesh(
         path_to_mesh=object_info.mesh_path,
         name="robot/movable_obj",
-        texture=object_info.texture_path,
+        texture=Path(
+            "/workspaces/object_following_ocp/ressources/meshes/b314794073c44ede838cf61627b5a3b7/material_0.png"),
         scale=object_info.scale,
         color=[0.8, 0.8, 0.8],
     )
@@ -250,8 +284,9 @@ if __name__ == "__main__":
         path_to_mesh=object_info.mesh_path,
         name="robot/movable_obj_ee",
         scale=object_info.scale,
-        texture=object_info.texture_path,
-        color=(1.0, 0.0, 0.0),
+        texture=Path(
+            "/workspaces/object_following_ocp/ressources/meshes/b314794073c44ede838cf61627b5a3b7/material_0.png"),
+        color=[1.0, 0.0, 0.0],
     )
     scene.add_object(o_EE)
 
@@ -312,10 +347,13 @@ if __name__ == "__main__":
 
             # Use GraspGenerator to compute IK for this target grasp pose
             grasp_generator = GraspGenerator(
+                rmodel=rmodel,
+                cmodel=cmodel,
                 obj_pose=T_robot_grasp_se3,
                 grasp_configurations_number=1,  # We only need one IK solution per grasp
+                ee_frame=ee_frame,
             )
-            grasps = grasp_generator.generate_grasps_configurations()
+            grasps = grasp_generator.generate_grasp_configurations()
 
             # Check validity of generated configurations
             valid_q = None
@@ -374,6 +412,7 @@ if __name__ == "__main__":
             safety_threshold=robot_config.safety_threshold,
             T=len(traj_robot),
             dt=robot_config.dt,
+            ee_frame=ee_frame
         )
 
         ocp = OCP_creator.create_OCP()
@@ -437,6 +476,8 @@ if __name__ == "__main__":
     # -----------------------------
     # Stage 5, visualize best case or all the end-effector trajectories
     # -----------------------------
+
+    saved_trajectories = []
 
     if vis_best_case and best_case is not None:
         traj_robot = best_case["traj_robot"]
@@ -511,8 +552,41 @@ if __name__ == "__main__":
 
                 time.sleep(0.05)
 
+            save = input("Save this trajectory? [y/N]: ").strip().lower()
+
+            if save == "y":
+                traj_robot = case["traj_robot"]
+                xs = case["xs"]
+
+                saved_case = {
+                    "robot": rob,
+                    "grasp_idx": case["grasp_idx"],
+                    "camera_translation": case["camera_translation"].tolist(),
+                    "object_trajectory_se3": trajectory_se3_to_list(traj_robot),
+                    "joint_trajectory": joint_trajectory_to_list(xs, rmodel.nq),
+                }
+
+                saved_trajectories.append(saved_case)
+                print("Trajectory saved.")
+            else:
+                print("Trajectory discarded.")
+
             input("Press Enter to continue to the next case...")
 
             for k in range(len(xs)):
                 scene[f"case_{i}_ee_{k}"].hide()
                 scene[f"case_{i}_target_{k}"].hide()
+
+    if len(saved_trajectories) > 0:
+        output_dir = Path("saved_trajectories")
+        output_dir.mkdir(exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = output_dir / f"saved_trajs_{rob}_{timestamp}.json"
+
+        # with open(output_path, "w") as f:
+        #     json.dump(saved_trajectories, f, indent=2)
+
+        print(f"Saved {len(saved_trajectories)} trajectories to {output_path}")
+    else:
+        print("No trajectories were saved.")
