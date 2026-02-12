@@ -9,12 +9,18 @@ class Trajectory:
 
     def transform(self, T: pin.SE3) -> "Trajectory":
         return Trajectory([T * p for p in self.poses])
-    
+
     def __getitem__(self, index: int) -> pin.SE3:
         return self.poses[index]
 
     def __len__(self) -> int:
         return self.T
+
+    def __mul__(self, T: pin.SE3) -> "Trajectory":
+        return Trajectory([p * T for p in self.poses])
+
+    def __rmul__(self, T: pin.SE3) -> "Trajectory":
+        return Trajectory([T * p for p in self.poses])
 
 
 class TrajectoryInConfigurationSpace:
@@ -27,7 +33,7 @@ class TrajectoryInConfigurationSpace:
 
     def __len__(self) -> int:
         return self.T
-    
+
     def get_EE_poses(self, rmodel: pin.Model) -> list[pin.SE3]:
         poses = []
         rdata = rmodel.createData()
@@ -46,7 +52,7 @@ class TrajectoryEvaluator:
         self.traj_in_configuration_space = traj_in_configuration_space
         self.rmodel = rmodel
         self.T = trajectory.T
-    
+
     def evaluate_position_error(self) -> float:
         error = 0.0
         ee_poses = self.traj_in_configuration_space.get_EE_poses(self.rmodel)
