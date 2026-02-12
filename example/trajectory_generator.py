@@ -1,4 +1,6 @@
+import json
 import time
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -25,6 +27,21 @@ vis_best_case = False  # set True to visualize only the best case found
 # -----------------------------
 
 CAMERA_YAW = 0.0  # Fixed yaw since diverse grasps already provide orientational variety
+
+
+def se3_to_dict(T: pin.SE3):
+    return {
+        "rotation": T.rotation.tolist(),
+        "translation": T.translation.tolist(),
+    }
+
+
+def trajectory_se3_to_list(traj):
+    return [se3_to_dict(T) for T in traj]
+
+
+def joint_trajectory_to_list(xs, nq):
+    return [x[:nq].tolist() for x in xs]
 
 
 def pose_distance_to_color(T_target, T_ee, d_min=0.05, d_max=0.2):
@@ -171,12 +188,8 @@ if __name__ == "__main__":
 
     # Load trajectory data from JSON
     json_path = Path(
-        "/workspaces/object_following_ocp/ressources/json/jug.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
-    )
-
-    # Path to graspgen output YAML file
-    grasp_yaml_path = Path(
-        "/workspaces/object_following_ocp/results/jug/jug_grasps_filtered_new.yml"
+        "/workspaces/object_following_ocp/ressources/json/"
+        "bowl5.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
     )
 
     # -----------------------------
@@ -187,13 +200,33 @@ if __name__ == "__main__":
 
     # Get object information (auto-selects first available object)
     object_info = parser.get_object_info(texture_name="material_0.png")
+    object_id = object_info.mesh_id
 
-    print(f"Object mesh: {object_info.mesh_path}")
-    print(f"Object scale: {object_info.scale}")
+    # Scale
+    scale_path = Path(
+        "/workspaces/object_following_ocp/ressources/grasps_scales.json")
+    with open(scale_path, "r") as f:
+        scale_data = json.load(f)
+
+    match = next(
+        (item for item in scale_data if item["Name"].strip() == object_id),
+        None
+    )
+
+    if match is None:
+        raise ValueError(f"No scale found for {object_id}")
+
+    scale = match["scale"]
+    print(scale)
 
     # -----------------------------
     # Load grasp poses from graspgen
     # -----------------------------
+
+    # Path to graspgen output YAML file
+    grasp_yaml_path = Path(
+        f"/workspaces/object_following_ocp/ressources/filtered_grasps/{object_id}_filtered.yml"
+    )
 
     print("Loading grasp poses from graspgen...")
     grasps_object_frame = load_grasps_from_yaml(
@@ -263,9 +296,9 @@ if __name__ == "__main__":
         nx=3,
         ny=3,
         nz=3,
-        xlim=(-0.3, 0.3),
-        ylim=(-0.4, 0.4),
-        zlim=(-0.5, 0.0),
+        xlim=(-0.4, 0.4),
+        ylim=(-0.5, 0.5),
+        zlim=(-0.5, -0.0),
     )
     all_trajs_robot = []
     camera_configs = []  # list of translations
@@ -322,22 +355,29 @@ if __name__ == "__main__":
             for q_candidate in grasps:
                 if is_grasp_valid(q_candidate, rmodel, cmodel, rdata, cdata):
                     valid_q = q_candidate
+                    # o.pose = obj_pose.homogeneous
+                    # robot[:] = valid_q
+                    # input()
                     break
 
             if valid_q is None:
                 continue
 
             t = camera_configs[i]
-
+            object_traj = Trajectory(traj_robot)
+            grasping_traj = object_traj * T_object_grasp
+            # for k in range(len(traj_robot)):
+            #     delta = traj_robot[k].inverse() * grasping_traj[k]
+            #     print((delta.translation - T_object_grasp.translation))
             valid_cases.append(
                 {
                     "camera_translation": t,
-                    "traj_robot": traj_robot,
-                    "grasp": valid_q,
+                    "object_trajectory": traj_robot,
+                    "grasping_trajectory": grasping_traj,
+                    "grasp_configuration": valid_q,
                     "grasp_idx": grasp_idx,
-                    "T_robot_grasp": T_robot_grasp_matrix,
-                }
-            )
+                    "T_object_grasp": T_object_grasp,
+                })
 
     print(
         f"Valid cases after grasp filtering: {len(valid_cases)} (from {len(all_trajs_robot)} camera configs)"
@@ -349,9 +389,8 @@ if __name__ == "__main__":
 
     for idx, case in enumerate(valid_cases):
         print(f"[OCP] Solving case {idx} (grasp {case['grasp_idx']})")
-
-        traj_robot = case["traj_robot"]
-        q0 = case["grasp"]
+        traj_robot = case["grasping_trajectory"]
+        q0 = case["grasp_configuration"]
 
         # Create weights dictionary from robot_config
         weights = {
@@ -400,7 +439,7 @@ if __name__ == "__main__":
         if not case.get("success", False):
             continue
 
-        traj_robot = case["traj_robot"]
+        traj_robot = case["grasping_trajectory"]
         xs = case["xs"]
 
         traj_in_configuration_space = TrajectoryInConfigurationSpace(
@@ -439,7 +478,7 @@ if __name__ == "__main__":
     # -----------------------------
 
     if vis_best_case and best_case is not None:
-        traj_robot = best_case["traj_robot"]
+        traj_robot = best_case["grasping_trajectory"]
         xs = best_case["xs"]
 
         for k, (x, target) in enumerate(zip(xs, traj_robot)):
@@ -466,16 +505,17 @@ if __name__ == "__main__":
             time.sleep(0.05)
 
     else:
+        saved_trajectories = []
         for i, case in enumerate(valid_cases):
             if not case.get("success", False):
                 continue
-
-            traj_robot = case["traj_robot"]
+            traj_robot = case["grasping_trajectory"]
             xs = case["xs"]
+
             print(
                 f"Visualizing case {i} (grasp {case['grasp_idx']}), position error {case['position_error']:.4f} m"
             )
-
+            ee_pose_list = []
             for k, (x, target) in enumerate(zip(xs, traj_robot)):
                 robot[:] = x[: rmodel.nq]
                 pin.forwardKinematics(rmodel, rdata, x[: rmodel.nq])
@@ -483,6 +523,7 @@ if __name__ == "__main__":
 
                 ee_frame_id = rmodel.getFrameId("panda_hand_tcp")
                 ee_pose = rdata.oMf[ee_frame_id]
+                ee_pose_list.append(ee_pose.copy())
 
                 scene.add_object(
                     Object.create_sphere(
@@ -511,8 +552,87 @@ if __name__ == "__main__":
 
                 time.sleep(0.05)
 
+            save = input("Save this trajectory? [y/N]: ").strip().lower()
+
+            if save == "y":
+                traj_robot = case["grasping_trajectory"]
+                xs = case["xs"]
+
+                saved_case = {
+                    "camera_translation": case["camera_translation"].tolist(),
+                    "ee_trajectory_se3": trajectory_se3_to_list(ee_pose_list),
+                    "joint_trajectory": joint_trajectory_to_list(xs, rmodel.nq),
+                    "target_se3": trajectory_se3_to_list(traj_robot)
+
+                }
+
+                saved_trajectories.append(saved_case)
+                print("Trajectory saved.")
+            else:
+                print("Trajectory discarded.")
+
             input("Press Enter to continue to the next case...")
 
             for k in range(len(xs)):
                 scene[f"case_{i}_ee_{k}"].hide()
                 scene[f"case_{i}_target_{k}"].hide()
+
+    if len(saved_trajectories) > 0:
+        output_dir = Path("saved_trajectories")
+        output_dir.mkdir(exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = output_dir / f"saved_trajs_{object_id}_{timestamp}.json"
+
+        with open(output_path, "w") as f:
+            json.dump(saved_trajectories, f, indent=2)
+
+    replay = input(
+        "Replay saved trajectories without objects? [y/N]: ").strip().lower()
+
+    if replay == "y":
+        # Hide the main object, keep o_EE visible
+        o.hide()
+
+        # Hide all the spheres from previous visualization
+        for i, case in enumerate(valid_cases):
+            if not case.get("success", False):
+                continue
+            xs = case["xs"]
+            for k in range(len(xs)):
+                scene[f"case_{i}_ee_{k}"].hide()
+                scene[f"case_{i}_target_{k}"].hide()
+
+        for saved_idx, saved_case in enumerate(saved_trajectories):
+            print(
+                f"Replaying saved trajectory {saved_idx + 1}/{len(saved_trajectories)}")
+
+            joint_traj = saved_case["joint_trajectory"]
+            ee_traj = saved_case["ee_trajectory_se3"]
+
+            # Animate robot and o_EE
+            for k in range(len(joint_traj)):
+                q = np.array(joint_traj[k])
+                robot[:] = q
+
+                # Update o_EE position to follow end-effector
+                ee_rotation = np.array(ee_traj[k]["rotation"])
+                ee_translation = np.array(ee_traj[k]["translation"])
+                T_ee = np.eye(4)
+                T_ee[:3, :3] = ee_rotation
+                T_ee[:3, 3] = ee_translation
+
+                T_offset = pin.SE3(
+                    pin.utils.rpyToMatrix(0.0, 0.0, np.pi / 2),
+                    np.array([0.0, 0.0, 0.0]),
+                )
+                o_EE.pose = (se3_to_pinocchio(T_ee) * T_offset).homogeneous
+
+                time.sleep(0.05)
+
+            input("Press Enter for next trajectory...")
+
+        print(
+            f"Saved {len(saved_trajectories)} trajectories to {output_path}")
+    else:
+        print("No trajectories were saved.")
