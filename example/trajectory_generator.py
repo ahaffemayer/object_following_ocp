@@ -189,7 +189,7 @@ if __name__ == "__main__":
     # Load trajectory data from JSON
     json_path = Path(
         "/workspaces/object_following_ocp/ressources/json/"
-        "bowl5.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
+        "bowl4.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
     )
 
     # -----------------------------
@@ -364,17 +364,19 @@ if __name__ == "__main__":
                 continue
 
             t = camera_configs[i]
-            object_traj = Trajectory(traj_robot)
-            grasping_traj = object_traj * T_object_grasp
-            # for k in range(len(traj_robot)):
-            #     delta = traj_robot[k].inverse() * grasping_traj[k]
-            #     print((delta.translation - T_object_grasp.translation))
+            grasping_traj = []
+            for T_robot_object_k in traj_robot:
+                T_robot_grasp_k = T_robot_object_k * T_object_grasp
+                grasping_traj.append(T_robot_grasp_k.copy())
+            for k in range(len(traj_robot)):
+                delta = traj_robot[k].inverse() * grasping_traj[k]
+                print((delta.translation - T_object_grasp.translation))
             valid_cases.append(
                 {
                     "camera_translation": t,
                     "object_trajectory": traj_robot,
                     "grasping_trajectory": grasping_traj,
-                    "grasp_configuration": valid_q,
+                    "grasp": valid_q,
                     "grasp_idx": grasp_idx,
                     "T_object_grasp": T_object_grasp,
                 })
@@ -390,7 +392,7 @@ if __name__ == "__main__":
     for idx, case in enumerate(valid_cases):
         print(f"[OCP] Solving case {idx} (grasp {case['grasp_idx']})")
         traj_robot = case["grasping_trajectory"]
-        q0 = case["grasp_configuration"]
+        q0 = case["grasp"]
 
         # Create weights dictionary from robot_config
         weights = {

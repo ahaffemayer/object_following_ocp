@@ -1,20 +1,19 @@
-import meshcat
-import numpy as np
-from pathlib import Path
-import pinocchio as pin
 import sys
+from pathlib import Path
 from typing import Any
-import numpy as np
+
 import colmpc as col
 import crocoddyl
-import pinocchio as pin
+import meshcat
 import mim_solvers
+import numpy as np
+import pinocchio as pin
 from pinocchio import visualize
-from robomeshcat import Scene, Object, Robot
+from robomeshcat import Object, Robot, Scene
 
-from object_following_ocp.robot_loader import load_reduced_panda, self_collision_pairs
 from object_following_ocp.ocp import OCP
 from object_following_ocp.parser_config import load_config
+from object_following_ocp.robot_loader import load_reduced_panda, self_collision_pairs
 
 
 class GraspGenerator:
@@ -130,13 +129,15 @@ class GraspGenerator:
     def _check_grasp_validity(self, q: np.ndarray) -> bool:
         """Checks if a given grasp configuration is valid (collision-free)."""
         pin.framesForwardKinematics(self.rmodel, self.rdata, q)
-        pin.updateGeometryPlacements(self.rmodel, self.rdata, self.cmodel, self.cdata)
+        pin.updateGeometryPlacements(
+            self.rmodel, self.rdata, self.cmodel, self.cdata)
         collisions = pin.computeCollisions(self.cmodel, self.cdata, True)
         if not collisions:
             # See if the end-effector is close enough to the object pose
             ee_frame_id = self.rmodel.getFrameId("panda_hand_tcp")
             ee_pose = self.rdata.oMf[ee_frame_id]
-            distance = np.linalg.norm(pin.log6(ee_pose.inverse() * self._obj_pose))
+            distance = np.linalg.norm(
+                pin.log6(ee_pose.inverse() * self._obj_pose))
             if distance < 0.05:  # 5 cm threshold
                 return True
         return False

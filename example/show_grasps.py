@@ -156,9 +156,9 @@ def visualize_gripper_as_sphere(vis, name, T, radius=0.01, color=0xFF0000):
 
 
 def main():
-    grasp_yaml = "/workspaces/object_following_ocp/results/jug/jug_grasps_filtered_new.yml"
-    object_mesh_path = "/workspaces/object_following_ocp/ressources/meshes/aadd0e6c42cb45f9982b0ce99a33bd27/aadd0e6c42cb45f9982b0ce99a33bd27.obj"
-    gripper_depth = 0.0465  # From your config file
+    grasp_yaml = "/workspaces/object_following_ocp/ressources/filtered_grasps/0d0d1c59b0474d2ea92ce2e172c9f56a_filtered.yml"
+    object_mesh_path = "/workspaces/object_following_ocp/ressources/meshes/0d0d1c59b0474d2ea92ce2e172c9f56a/0d0d1c59b0474d2ea92ce2e172c9f56a.obj"
+    gripper_depth = 0.09  # From your config file
 
     vis = create_visualizer(clear=True)
 
