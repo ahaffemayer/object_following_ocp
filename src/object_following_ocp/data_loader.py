@@ -57,6 +57,19 @@ class GraspPose:
 
 
 @dataclass
+class RobotConfig:
+    """Robot-specific configuration from YAML"""
+    W_xREG: float
+    W_uREG: float
+    W_gripper_pose: float
+    W_gripper_pose_term: float
+    W_limit: float
+    safety_threshold: float
+    dt: float
+    gripper_depth: float
+
+
+@dataclass
 class DataLoader:
     """Loader for a single object trajectory with its grasp poses and scale"""
     object_info: ObjectInfo
@@ -223,6 +236,27 @@ class DataLoader:
     def has_grasps(self) -> bool:
         """Check if grasp poses were loaded"""
         return len(self.grasp_poses) > 0
+
+
+class ConfigLoader:
+    """Load robot configuration from YAML"""
+
+    @staticmethod
+    def load(yaml_path: str) -> RobotConfig:
+        with open(yaml_path, 'r') as f:
+            config = yaml.safe_load(f)
+
+        weights = config['weights']
+        return RobotConfig(
+            W_xREG=weights['W_xREG'],
+            W_uREG=weights['W_uREG'],
+            W_gripper_pose=weights['W_gripper_pose'],
+            W_gripper_pose_term=weights['W_gripper_pose_term'],
+            W_limit=weights['W_limit'],
+            safety_threshold=config['safety_threshold'],
+            dt=config['dt'],
+            gripper_depth=config['gripper_depth']
+        )
 
 
 if __name__ == "__main__":
