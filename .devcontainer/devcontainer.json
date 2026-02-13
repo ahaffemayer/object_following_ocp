@@ -1,12 +1,16 @@
 {
-  "name": "Colmpc with Pinocchio",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
-  "features": {
-    "ghcr.io/devcontainers/features/common-utils:2": {
-      "installZsh": true,
-      "installOhMyZsh": true,
-      "upgradePackages": false
-    }
+  "name": "PyTorch + cuRobo GPU Dev Container",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "runArgs": [
+    "--gpus",
+    "all",
+    "--shm-size=8gb"
+  ],
+  "containerEnv": {
+    "GIT_EDITOR": "code --wait"
   },
   "customizations": {
     "vscode": {
@@ -15,28 +19,42 @@
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
         "ms-toolsai.jupyter",
-        "njpwerner.autodocstring"
+        "ms-toolsai.vscode-jupyter-cell-tags",
+        "ms-toolsai.jupyter-keymap",
+        "ms-toolsai.jupyter-renderers",
+        "ms-vscode.live-server"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/workspaces/object_following_ocp/.venv/bin/python",
+        "python.defaultInterpreterPath": "/usr/bin/python3",
         "python.analysis.typeCheckingMode": "basic",
+        "python.linting.enabled": false,
+        "python.formatting.provider": "none",
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
-          "source.organizeImports": "explicit"
+          "source.fixAll.ruff": "explicit",
+          "source.organizeImports.ruff": "explicit"
+        },
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true
+        },
+        // Ensure TensorBoard/Meshcat ports are labeled
+        "portsAttributes": {
+          "6006": {
+            "label": "TensorBoard",
+            "onAutoForward": "notify"
+          },
+          "7000": {
+            "label": "Meshcat",
+            "onAutoForward": "openBrowser"
+          }
         }
       }
     }
   },
-  "postCreateCommand": "bash .devcontainer/setup.sh",
-  "remoteUser": "vscode",
-  "mounts": [
-    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind"
+  "forwardPorts": [
+    6006,
+    7000
   ],
-  "runArgs": [
-    "--network=host"
-  ],
-  "containerEnv": {
-    "DISPLAY": "${localEnv:DISPLAY}",
-    "PYTHONUNBUFFERED": "1"
-  }
+  "remoteUser": "root"
 }
