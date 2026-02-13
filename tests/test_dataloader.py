@@ -772,5 +772,209 @@ class TestDataLoaderWithRealFiles:
         # Note: mesh files may be in a different location, so we just check the filename
 
 
+class TestRobotConfig:
+    """Tests for RobotConfig dataclass"""
+
+    def test_robot_config_creation(self):
+        """Test creating a RobotConfig object"""
+        from object_following_ocp.data_loader import RobotConfig
+
+        config = RobotConfig(
+            W_xREG=0.001,
+            W_uREG=0.001,
+            W_gripper_pose=1000.0,
+            W_gripper_pose_term=100.0,
+            W_limit=100.0,
+            safety_threshold=0.02,
+            dt=0.01,
+            gripper_depth=0.1034,
+            T=15
+
+        )
+
+        assert config.W_xREG == pytest.approx(0.001)
+        assert config.W_uREG == pytest.approx(0.001)
+        assert config.W_gripper_pose == pytest.approx(1000.0)
+        assert config.W_gripper_pose_term == pytest.approx(100.0)
+        assert config.W_limit == pytest.approx(100.0)
+        assert config.safety_threshold == pytest.approx(0.02)
+        assert config.dt == pytest.approx(0.01)
+        assert config.gripper_depth == pytest.approx(0.1034)
+        assert config.T == pytest.approx(15)
+
+    def test_robot_config_attributes(self):
+        """Test that RobotConfig has all expected attributes"""
+        from object_following_ocp.data_loader import RobotConfig
+
+        config = RobotConfig(
+            W_xREG=1.0,
+            W_uREG=2.0,
+            W_gripper_pose=3.0,
+            W_gripper_pose_term=4.0,
+            W_limit=5.0,
+            safety_threshold=6.0,
+            dt=7.0,
+            gripper_depth=8.0,
+            T=15
+        )
+
+        # Verify all attributes are accessible
+        assert hasattr(config, 'W_xREG')
+        assert hasattr(config, 'W_uREG')
+        assert hasattr(config, 'W_gripper_pose')
+        assert hasattr(config, 'W_gripper_pose_term')
+        assert hasattr(config, 'W_limit')
+        assert hasattr(config, 'safety_threshold')
+        assert hasattr(config, 'dt')
+        assert hasattr(config, 'gripper_depth')
+        assert hasattr(config, 'T')
+
+
+class TestConfigLoader:
+    """Tests for ConfigLoader class"""
+
+    @pytest.fixture
+    def temp_config_file(self, tmp_path):
+        """Create a temporary config YAML file"""
+        config_data = {
+            'weights': {
+                'W_xREG': 0.001,
+                'W_uREG': 0.001,
+                'W_gripper_pose': 1000.0,
+                'W_gripper_pose_term': 100.0,
+                'W_limit': 100.0
+            },
+            'safety_threshold': 0.02,
+            'dt': 0.01,
+            'gripper_depth': 0.1034,
+            'T': 15
+        }
+
+        config_path = tmp_path / "test_config.yml"
+        with open(config_path, 'w') as f:
+            yaml.dump(config_data, f)
+
+        return config_path
+
+    def test_config_loader_load(self, temp_config_file):
+        """Test ConfigLoader.load() method"""
+        from object_following_ocp.data_loader import ConfigLoader
+
+        config = ConfigLoader.load(str(temp_config_file))
+
+        assert config.W_xREG == pytest.approx(0.001)
+        assert config.W_uREG == pytest.approx(0.001)
+        assert config.W_gripper_pose == pytest.approx(1000.0)
+        assert config.W_gripper_pose_term == pytest.approx(100.0)
+        assert config.W_limit == pytest.approx(100.0)
+        assert config.safety_threshold == pytest.approx(0.02)
+        assert config.dt == pytest.approx(0.01)
+        assert config.gripper_depth == pytest.approx(0.1034)
+        assert config.T == pytest.approx(15)
+
+    def test_config_loader_returns_robot_config(self, temp_config_file):
+        """Test that ConfigLoader returns a RobotConfig instance"""
+        from object_following_ocp.data_loader import ConfigLoader, RobotConfig
+
+        config = ConfigLoader.load(str(temp_config_file))
+
+        assert isinstance(config, RobotConfig)
+
+    def test_config_loader_with_different_values(self, tmp_path):
+        """Test ConfigLoader with different config values"""
+        from object_following_ocp.data_loader import ConfigLoader
+
+        config_data = {
+            'weights': {
+                'W_xREG': 0.01,
+                'W_uREG': 0.02,
+                'W_gripper_pose': 500.0,
+                'W_gripper_pose_term': 50.0,
+                'W_limit': 200.0
+            },
+            'safety_threshold': 0.05,
+            'dt': 0.02,
+            'gripper_depth': 0.15,
+            'T': 10
+        }
+
+        config_path = tmp_path / "custom_config.yml"
+        with open(config_path, 'w') as f:
+            yaml.dump(config_data, f)
+
+        config = ConfigLoader.load(str(config_path))
+
+        assert config.W_xREG == pytest.approx(0.01)
+        assert config.W_uREG == pytest.approx(0.02)
+        assert config.W_gripper_pose == pytest.approx(500.0)
+        assert config.W_gripper_pose_term == pytest.approx(50.0)
+        assert config.W_limit == pytest.approx(200.0)
+        assert config.safety_threshold == pytest.approx(0.05)
+        assert config.dt == pytest.approx(0.02)
+        assert config.gripper_depth == pytest.approx(0.15)
+
+    def test_config_loader_missing_file(self):
+        """Test ConfigLoader with non-existent file"""
+        from object_following_ocp.data_loader import ConfigLoader
+
+        with pytest.raises(FileNotFoundError):
+            ConfigLoader.load("/nonexistent/path/config.yml")
+
+    def test_config_loader_invalid_yaml(self, tmp_path):
+        """Test ConfigLoader with invalid YAML"""
+        from object_following_ocp.data_loader import ConfigLoader
+
+        config_path = tmp_path / "invalid.yml"
+        with open(config_path, 'w') as f:
+            f.write("{ invalid yaml content [")
+
+        with pytest.raises(yaml.YAMLError):
+            ConfigLoader.load(str(config_path))
+
+    def test_config_loader_missing_weights_section(self, tmp_path):
+        """Test ConfigLoader with missing weights section"""
+        from object_following_ocp.data_loader import ConfigLoader
+
+        config_data = {
+            'safety_threshold': 0.02,
+            'dt': 0.01,
+            'gripper_depth': 0.1034
+        }
+
+        config_path = tmp_path / "no_weights.yml"
+        with open(config_path, 'w') as f:
+            yaml.dump(config_data, f)
+
+        with pytest.raises(KeyError):
+            ConfigLoader.load(str(config_path))
+
+    @pytest.mark.skipif(
+        not pathlib.Path("/workspaces/object_following_ocp").exists(),
+        reason="Real config file not available in this environment"
+    )
+    def test_config_loader_real_file(self):
+        """Test ConfigLoader with the real config file"""
+        from object_following_ocp.data_loader import ConfigLoader
+
+        config_path = pathlib.Path(
+            "/workspaces/object_following_ocp/example/robot_motion/configs/ik_config.yml"
+        )
+
+        if not config_path.exists():
+            pytest.skip(f"Config file not found: {config_path}")
+
+        config = ConfigLoader.load(str(config_path))
+
+        # Test with expected values from the real file
+        assert config.W_xREG == pytest.approx(0.001)
+        assert config.W_uREG == pytest.approx(0.001)
+        assert config.W_gripper_pose == pytest.approx(1000.0)
+        assert config.W_gripper_pose_term == pytest.approx(100.0)
+        assert config.W_limit == pytest.approx(100.0)
+        assert config.safety_threshold == pytest.approx(0.02)
+        assert config.dt == pytest.approx(0.01)
+        assert config.gripper_depth == pytest.approx(0.1034)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
