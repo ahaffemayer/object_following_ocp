@@ -66,6 +66,7 @@ class RobotConfig:
     W_limit: float
     safety_threshold: float
     dt: float
+    T: int
     gripper_depth: float
 
 
@@ -242,7 +243,7 @@ class ConfigLoader:
     """Load robot configuration from YAML"""
 
     @staticmethod
-    def load(yaml_path: str) -> RobotConfig:
+    def load(yaml_path: str | pathlib.Path) -> RobotConfig:
         with open(yaml_path, 'r') as f:
             config = yaml.safe_load(f)
 
@@ -254,6 +255,7 @@ class ConfigLoader:
             W_gripper_pose_term=weights['W_gripper_pose_term'],
             W_limit=weights['W_limit'],
             safety_threshold=config['safety_threshold'],
+            T=config["T"],
             dt=config['dt'],
             gripper_depth=config['gripper_depth']
         )
