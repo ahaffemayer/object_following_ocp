@@ -3,10 +3,9 @@ Unit tests for DataLoader and related classes.
 
 To run: pytest test_dataloader.py -v
 """
+
 import json
 import pathlib
-import tempfile
-from typing import Dict
 
 import numpy as np
 import pinocchio as pin
@@ -37,7 +36,7 @@ class TestPoseData:
             R=R,
             t=t,
             bbox_visib=[100, 200, 300, 400],
-            time=1.0
+            time=1.0,
         )
 
         assert pose.im_id == 0
@@ -50,11 +49,7 @@ class TestPoseData:
 
     def test_pose_to_SE3(self):
         """Test conversion from PoseData to SE3"""
-        R = np.array([
-            [0, -1, 0],
-            [1, 0, 0],
-            [0, 0, 1]
-        ])
+        R = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
         t = np.array([1.0, 2.0, 3.0])
 
         pose = PoseData(
@@ -64,7 +59,7 @@ class TestPoseData:
             R=R,
             t=t,
             bbox_visib=[100, 200, 300, 400],
-            time=1.0
+            time=1.0,
         )
 
         se3 = pose.to_SE3()
@@ -83,10 +78,7 @@ class TestGraspPose:
         orientation = np.array([0.7071, 0.7071, 0.0, 0.0])  # [w, x, y, z]
 
         grasp = GraspPose(
-            name="grasp_0",
-            confidence=0.95,
-            position=position,
-            orientation=orientation
+            name="grasp_0", confidence=0.95, position=position, orientation=orientation
         )
 
         assert grasp.name == "grasp_0"
@@ -101,10 +93,7 @@ class TestGraspPose:
         orientation = np.array([1.0, 0.0, 0.0, 0.0])
 
         grasp = GraspPose(
-            name="grasp_0",
-            confidence=0.95,
-            position=position,
-            orientation=orientation
+            name="grasp_0", confidence=0.95, position=position, orientation=orientation
         )
 
         se3 = grasp.to_SE3()
@@ -112,34 +101,27 @@ class TestGraspPose:
         assert isinstance(se3, pin.SE3)
         np.testing.assert_array_almost_equal(se3.translation, position)
         # Identity quaternion should give identity rotation
-        np.testing.assert_array_almost_equal(
-            se3.rotation, np.eye(3), decimal=5)
+        np.testing.assert_array_almost_equal(se3.rotation, np.eye(3), decimal=5)
 
     def test_grasp_quaternion_conversion(self):
         """Test that quaternion conversion follows correct convention"""
         position = np.array([0.0, 0.0, 0.0])
         # 90 degree rotation around z-axis: [cos(45°), 0, 0, sin(45°)]
-        orientation = np.array(
-            [0.7071067811865476, 0.0, 0.0, 0.7071067811865476])
+        orientation = np.array([0.7071067811865476, 0.0, 0.0, 0.7071067811865476])
 
         grasp = GraspPose(
             name="grasp_test",
             confidence=0.9,
             position=position,
-            orientation=orientation
+            orientation=orientation,
         )
 
         se3 = grasp.to_SE3()
 
         # Expected rotation matrix for 90° around z
-        expected_R = np.array([
-            [0, -1, 0],
-            [1, 0, 0],
-            [0, 0, 1]
-        ])
+        expected_R = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 
-        np.testing.assert_array_almost_equal(
-            se3.rotation, expected_R, decimal=5)
+        np.testing.assert_array_almost_equal(se3.rotation, expected_R, decimal=5)
 
 
 class TestObjectInfo:
@@ -155,7 +137,7 @@ class TestObjectInfo:
             score=0.75,
             scale=0.1,
             mesh_path=mesh_path,
-            texture_path=texture_path
+            texture_path=texture_path,
         )
 
         assert obj_info.mesh_id == "abc123"
@@ -169,10 +151,7 @@ class TestObjectInfo:
         mesh_path = pathlib.Path("/path/to/mesh.obj")
 
         obj_info = ObjectInfo(
-            mesh_id="abc123",
-            score=0.75,
-            scale=0.1,
-            mesh_path=mesh_path
+            mesh_id="abc123", score=0.75, scale=0.1, mesh_path=mesh_path
         )
 
         assert obj_info.texture_path is None
@@ -190,7 +169,7 @@ class TestDataLoader:
                 "2": {
                     "mesh": "0d0d1c59b0474d2ea92ce2e172c9f56a",
                     "score": 0.7291240692138672,
-                    "scale": 0.07171772395566117
+                    "scale": 0.07171772395566117,
                 }
             },
             "poses": [
@@ -199,15 +178,21 @@ class TestDataLoader:
                     "object_id": 2,
                     "score": 0.38671875,
                     "R": [
-                        [-0.9735720171552442, 0.22036993567234633, -
-                            0.059955140430447834],
-                        [-0.10804320588553487, -
-                            0.675714976133025, -0.7292022604816316],
-                        [-0.2012068415194789, -0.7034531700698429, 0.6816666666666664]
+                        [
+                            -0.9735720171552442,
+                            0.22036993567234633,
+                            -0.059955140430447834,
+                        ],
+                        [-0.10804320588553487, -0.675714976133025, -0.7292022604816316],
+                        [-0.2012068415194789, -0.7034531700698429, 0.6816666666666664],
                     ],
-                    "t": [-0.22166704223417696, -0.0755651959446513, 0.8099392606970864],
+                    "t": [
+                        -0.22166704223417696,
+                        -0.0755651959446513,
+                        0.8099392606970864,
+                    ],
                     "bbox_visib": [268, 82, 522, 310],
-                    "time": 0.0
+                    "time": 0.0,
                 },
                 {
                     "im_id": 1,
@@ -216,13 +201,13 @@ class TestDataLoader:
                     "R": [
                         [-0.97, 0.22, -0.06],
                         [-0.11, -0.68, -0.73],
-                        [-0.20, -0.70, 0.68]
+                        [-0.20, -0.70, 0.68],
                     ],
                     "t": [-0.21, -0.08, 0.81],
                     "bbox_visib": [270, 85, 520, 308],
-                    "time": 0.033
-                }
-            ]
+                    "time": 0.033,
+                },
+            ],
         }
 
         # Create grasp poses YAML
@@ -232,21 +217,37 @@ class TestDataLoader:
             "grasps": {
                 "grasp_0": {
                     "confidence": 0.9850150942802429,
-                    "position": [0.09796400394090717, 0.04605246219166667, 0.0335818800359627],
+                    "position": [
+                        0.09796400394090717,
+                        0.04605246219166667,
+                        0.0335818800359627,
+                    ],
                     "orientation": {
                         "w": -0.02462670080231983,
-                        "xyz": [0.8126014170473901, 0.007884706018450371, -0.582245905121856]
-                    }
+                        "xyz": [
+                            0.8126014170473901,
+                            0.007884706018450371,
+                            -0.582245905121856,
+                        ],
+                    },
                 },
                 "grasp_1": {
                     "confidence": 0.9798907041549683,
-                    "position": [-0.08693484936109479, -0.1273814078854665, -0.033933113214407326],
+                    "position": [
+                        -0.08693484936109479,
+                        -0.1273814078854665,
+                        -0.033933113214407326,
+                    ],
                     "orientation": {
                         "w": -0.13208252084043554,
-                        "xyz": [0.5461539955528465, 0.18659771640219328, 0.8058854217961657]
-                    }
-                }
-            }
+                        "xyz": [
+                            0.5461539955528465,
+                            0.18659771640219328,
+                            0.8058854217961657,
+                        ],
+                    },
+                },
+            },
         }
 
         # Create scales JSON
@@ -254,13 +255,9 @@ class TestDataLoader:
             {
                 "Name": "0d0d1c59b0474d2ea92ce2e172c9f56a",
                 "scale": 0.09,
-                "scale_from_dataset": 0.136
+                "scale_from_dataset": 0.136,
             },
-            {
-                "Name": "other_mesh_id",
-                "scale": 0.08,
-                "scale_from_dataset": 0.162
-            }
+            {"Name": "other_mesh_id", "scale": 0.08, "scale_from_dataset": 0.162},
         ]
 
         # Write files
@@ -282,8 +279,9 @@ class TestDataLoader:
         # traj_path = tmp_path/trajectory.json
         # .parent = tmp_path
         # .parent.parent = tmp_path's parent
-        mesh_base_dir = traj_path.parent.parent / \
-            "meshes" / "0d0d1c59b0474d2ea92ce2e172c9f56a"
+        mesh_base_dir = (
+            traj_path.parent.parent / "meshes" / "0d0d1c59b0474d2ea92ce2e172c9f56a"
+        )
         mesh_base_dir.mkdir(parents=True, exist_ok=True)
         (mesh_base_dir / "0d0d1c59b0474d2ea92ce2e172c9f56a.obj").touch()
         (mesh_base_dir / "material_0.png").touch()
@@ -292,7 +290,7 @@ class TestDataLoader:
             "trajectory": traj_path,
             "grasp": grasp_path,
             "scales": scales_path,
-            "tmp_path": tmp_path
+            "tmp_path": tmp_path,
         }
 
     def test_dataloader_initialization(self, temp_files):
@@ -300,7 +298,7 @@ class TestDataLoader:
         loader = DataLoader(
             object_trajectory_path=temp_files["trajectory"],
             grasp_poses_SE3_path=temp_files["grasp"],
-            scales_path=temp_files["scales"]
+            scales_path=temp_files["scales"],
         )
 
         # Check object info
@@ -319,8 +317,7 @@ class TestDataLoader:
         # Check grasp poses
         assert len(loader.grasp_poses) == 2
         assert loader.grasp_poses[0].name == "grasp_0"
-        assert loader.grasp_poses[0].confidence == pytest.approx(
-            0.9850150942802429)
+        assert loader.grasp_poses[0].confidence == pytest.approx(0.9850150942802429)
         assert loader.grasp_poses[1].name == "grasp_1"
 
     def test_scale_override(self, temp_files):
@@ -328,7 +325,7 @@ class TestDataLoader:
         loader = DataLoader(
             object_trajectory_path=temp_files["trajectory"],
             grasp_poses_SE3_path=temp_files["grasp"],
-            scales_path=temp_files["scales"]
+            scales_path=temp_files["scales"],
         )
 
         # Scale from scales.json (0.09) should override trajectory (0.0717...)
@@ -340,7 +337,7 @@ class TestDataLoader:
         loader = DataLoader(
             object_trajectory_path=temp_files["trajectory"],
             grasp_poses_SE3_path=temp_files["grasp"],
-            scales_path=temp_files["scales"]
+            scales_path=temp_files["scales"],
         )
 
         # With .parent.parent:
@@ -348,10 +345,18 @@ class TestDataLoader:
         # .parent = tmp_path
         # .parent.parent = tmp_path's parent
         # Then /meshes/ is added
-        expected_mesh = temp_files["trajectory"].parent.parent / "meshes" / \
-            "0d0d1c59b0474d2ea92ce2e172c9f56a" / "0d0d1c59b0474d2ea92ce2e172c9f56a.obj"
-        expected_texture = temp_files["trajectory"].parent.parent / "meshes" / \
-            "0d0d1c59b0474d2ea92ce2e172c9f56a" / "material_0.png"
+        expected_mesh = (
+            temp_files["trajectory"].parent.parent
+            / "meshes"
+            / "0d0d1c59b0474d2ea92ce2e172c9f56a"
+            / "0d0d1c59b0474d2ea92ce2e172c9f56a.obj"
+        )
+        expected_texture = (
+            temp_files["trajectory"].parent.parent
+            / "meshes"
+            / "0d0d1c59b0474d2ea92ce2e172c9f56a"
+            / "material_0.png"
+        )
 
         assert loader.object_info.mesh_path == expected_mesh
         assert loader.object_info.texture_path == expected_texture
@@ -361,7 +366,7 @@ class TestDataLoader:
         loader = DataLoader(
             object_trajectory_path=temp_files["trajectory"],
             grasp_poses_SE3_path=temp_files["grasp"],
-            scales_path=temp_files["scales"]
+            scales_path=temp_files["scales"],
         )
 
         trajectory = loader.to_trajectory_SE3()
@@ -373,7 +378,8 @@ class TestDataLoader:
         se3_0 = trajectory[0]
         assert isinstance(se3_0, pin.SE3)
         expected_t_0 = np.array(
-            [-0.22166704223417696, -0.0755651959446513, 0.8099392606970864])
+            [-0.22166704223417696, -0.0755651959446513, 0.8099392606970864]
+        )
         np.testing.assert_array_almost_equal(se3_0.translation, expected_t_0)
 
     def test_best_grasp_property(self, temp_files):
@@ -381,7 +387,7 @@ class TestDataLoader:
         loader = DataLoader(
             object_trajectory_path=temp_files["trajectory"],
             grasp_poses_SE3_path=temp_files["grasp"],
-            scales_path=temp_files["scales"]
+            scales_path=temp_files["scales"],
         )
 
         best = loader.best_grasp
@@ -394,16 +400,16 @@ class TestDataLoader:
         loader = DataLoader(
             object_trajectory_path=temp_files["trajectory"],
             grasp_poses_SE3_path=temp_files["grasp"],
-            scales_path=temp_files["scales"]
+            scales_path=temp_files["scales"],
         )
 
         best_se3 = loader.best_grasp_SE3
 
         assert isinstance(best_se3, pin.SE3)
         expected_position = np.array(
-            [0.09796400394090717, 0.04605246219166667, 0.0335818800359627])
-        np.testing.assert_array_almost_equal(
-            best_se3.translation, expected_position)
+            [0.09796400394090717, 0.04605246219166667, 0.0335818800359627]
+        )
+        np.testing.assert_array_almost_equal(best_se3.translation, expected_position)
 
     def test_invalid_object_count(self, tmp_path):
         """Test that DataLoader raises error with multiple objects in file"""
@@ -411,9 +417,9 @@ class TestDataLoader:
         multi_object_data = {
             "objects": {
                 "1": {"mesh": "mesh1", "score": 0.5, "scale": 0.1},
-                "2": {"mesh": "mesh2", "score": 0.6, "scale": 0.2}
+                "2": {"mesh": "mesh2", "score": 0.6, "scale": 0.2},
             },
-            "poses": []
+            "poses": [],
         }
 
         traj_path = tmp_path / "multi_traj.json"
@@ -436,21 +442,15 @@ class TestDataLoader:
             DataLoader(
                 object_trajectory_path=traj_path,
                 scales_path=scales_path,
-                grasp_poses_SE3_path=grasp_path
+                grasp_poses_SE3_path=grasp_path,
             )
 
     def test_scale_fallback(self, tmp_path):
         """Test that object scale is used when not in scales file"""
         # Create data with mesh_id not in scales
         object_data = {
-            "objects": {
-                "1": {
-                    "mesh": "unknown_mesh_id",
-                    "score": 0.5,
-                    "scale": 0.123
-                }
-            },
-            "poses": []
+            "objects": {"1": {"mesh": "unknown_mesh_id", "score": 0.5, "scale": 0.123}},
+            "poses": [],
         }
 
         scales_data = [
@@ -479,7 +479,7 @@ class TestDataLoader:
         loader = DataLoader(
             object_trajectory_path=traj_path,
             scales_path=scales_path,
-            grasp_poses_SE3_path=grasp_path
+            grasp_poses_SE3_path=grasp_path,
         )
 
         # Should use scale from object file
@@ -490,7 +490,7 @@ class TestDataLoader:
         loader = DataLoader(
             object_trajectory_path=temp_files["trajectory"],
             grasp_poses_SE3_path=temp_files["grasp"],
-            scales_path=temp_files["scales"]
+            scales_path=temp_files["scales"],
         )
 
         pose = loader.poses[0]
@@ -505,7 +505,7 @@ class TestDataLoader:
         loader = DataLoader(
             object_trajectory_path=temp_files["trajectory"],
             grasp_poses_SE3_path=temp_files["grasp"],
-            scales_path=temp_files["scales"]
+            scales_path=temp_files["scales"],
         )
 
         grasp = loader.grasp_poses[0]
@@ -519,7 +519,7 @@ class TestDataLoader:
         """Test that grasps are not loaded by default"""
         loader = DataLoader(
             object_trajectory_path=temp_files["trajectory"],
-            scales_path=temp_files["scales"]
+            scales_path=temp_files["scales"],
             # Note: no grasp path, no load_grasps flag
         )
 
@@ -534,14 +534,8 @@ class TestDataLoader:
 
         # Create trajectory file
         object_data = {
-            "objects": {
-                "1": {
-                    "mesh": mesh_id,
-                    "score": 0.5,
-                    "scale": 0.1
-                }
-            },
-            "poses": []
+            "objects": {"1": {"mesh": mesh_id, "score": 0.5, "scale": 0.1}},
+            "poses": [],
         }
 
         # Create directory structure
@@ -567,7 +561,7 @@ class TestDataLoader:
                 "grasp_0": {
                     "confidence": 0.95,
                     "position": [0.1, 0.2, 0.3],
-                    "orientation": {"w": 1.0, "xyz": [0.0, 0.0, 0.0]}
+                    "orientation": {"w": 1.0, "xyz": [0.0, 0.0, 0.0]},
                 }
             }
         }
@@ -583,9 +577,7 @@ class TestDataLoader:
 
         # Test auto-loading
         loader = DataLoader(
-            object_trajectory_path=traj_path,
-            scales_path=scales_path,
-            load_grasps=True
+            object_trajectory_path=traj_path, scales_path=scales_path, load_grasps=True
         )
 
         assert loader.has_grasps
@@ -597,14 +589,8 @@ class TestDataLoader:
         """Test that auto-loading fails gracefully when grasp file doesn't exist"""
         # Create trajectory file
         object_data = {
-            "objects": {
-                "1": {
-                    "mesh": "nonexistent_mesh",
-                    "score": 0.5,
-                    "scale": 0.1
-                }
-            },
-            "poses": []
+            "objects": {"1": {"mesh": "nonexistent_mesh", "score": 0.5, "scale": 0.1}},
+            "poses": [],
         }
 
         json_dir = tmp_path / "json"
@@ -626,9 +612,7 @@ class TestDataLoader:
 
         # Should not raise, just not load grasps
         loader = DataLoader(
-            object_trajectory_path=traj_path,
-            scales_path=scales_path,
-            load_grasps=True
+            object_trajectory_path=traj_path, scales_path=scales_path, load_grasps=True
         )
 
         assert not loader.has_grasps
@@ -670,21 +654,23 @@ class TestDataLoaderWithRealFiles:
         """Real file paths from your workspace"""
         base = pathlib.Path("/workspaces/object_following_ocp")
         return {
-            "grasp": base / "ressources/filtered_grasps/0d0d1c59b0474d2ea92ce2e172c9f56a_filtered.yml",
-            "trajectory": base / "ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json",
-            "scales": base / "ressources/grasps_scales.json"
+            "grasp": base
+            / "ressources/filtered_grasps/0d0d1c59b0474d2ea92ce2e172c9f56a_filtered.yml",
+            "trajectory": base
+            / "ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json",
+            "scales": base / "ressources/grasps_scales.json",
         }
 
     @pytest.mark.skipif(
         not pathlib.Path("/workspaces/object_following_ocp").exists(),
-        reason="Real files not available in this environment"
+        reason="Real files not available in this environment",
     )
     def test_real_files_load(self, real_file_paths):
         """Test that real files load without errors"""
         loader = DataLoader(
             object_trajectory_path=real_file_paths["trajectory"],
             grasp_poses_SE3_path=real_file_paths["grasp"],
-            scales_path=real_file_paths["scales"]
+            scales_path=real_file_paths["scales"],
         )
 
         # Basic sanity checks
@@ -704,7 +690,7 @@ class TestDataLoaderWithRealFiles:
 
     @pytest.mark.skipif(
         not pathlib.Path("/workspaces/object_following_ocp").exists(),
-        reason="Real files not available in this environment"
+        reason="Real files not available in this environment",
     )
     def test_real_files_expected_values(self, real_file_paths):
         """
@@ -715,7 +701,7 @@ class TestDataLoaderWithRealFiles:
         loader = DataLoader(
             object_trajectory_path=real_file_paths["trajectory"],
             grasp_poses_SE3_path=real_file_paths["grasp"],
-            scales_path=real_file_paths["scales"]
+            scales_path=real_file_paths["scales"],
         )
 
         # Object info
@@ -730,7 +716,8 @@ class TestDataLoaderWithRealFiles:
 
         # First pose
         expected_t_0 = np.array(
-            [-0.22166704223417696, -0.0755651959446513, 0.8099392606970864])
+            [-0.22166704223417696, -0.0755651959446513, 0.8099392606970864]
+        )
         np.testing.assert_array_almost_equal(loader.poses[0].t, expected_t_0)
         assert loader.poses[0].score == pytest.approx(0.38671875)
         assert loader.poses[0].im_id == 0
@@ -738,23 +725,31 @@ class TestDataLoaderWithRealFiles:
 
         # First pose rotation (sample check of first row)
         expected_R_0_row0 = np.array(
-            [-0.9735720171552442, 0.22036993567234633, -0.059955140430447834])
-        np.testing.assert_array_almost_equal(
-            loader.poses[0].R[0], expected_R_0_row0)
+            [-0.9735720171552442, 0.22036993567234633, -0.059955140430447834]
+        )
+        np.testing.assert_array_almost_equal(loader.poses[0].R[0], expected_R_0_row0)
 
         # Best grasp
         assert loader.best_grasp.name == "grasp_2"
-        assert loader.best_grasp.confidence == pytest.approx(
-            0.9861612319946289)
+        assert loader.best_grasp.confidence == pytest.approx(0.9861612319946289)
         expected_grasp_pos = np.array(
-            [-0.05379145939103063, 0.06558237853773982, -0.07833266153636968])
+            [-0.05379145939103063, 0.06558237853773982, -0.07833266153636968]
+        )
         np.testing.assert_array_almost_equal(
-            loader.best_grasp.position, expected_grasp_pos)
+            loader.best_grasp.position, expected_grasp_pos
+        )
 
         expected_grasp_ori = np.array(
-            [0.9513417916293845, -0.01512138067120747, 0.30711066173445567, -0.02007936241552457])
+            [
+                0.9513417916293845,
+                -0.01512138067120747,
+                0.30711066173445567,
+                -0.02007936241552457,
+            ]
+        )
         np.testing.assert_array_almost_equal(
-            loader.best_grasp.orientation, expected_grasp_ori)
+            loader.best_grasp.orientation, expected_grasp_ori
+        )
 
         # Trajectory conversion
         trajectory = loader.to_trajectory_SE3()
@@ -763,11 +758,12 @@ class TestDataLoaderWithRealFiles:
 
         # Best grasp SE3
         best_se3 = loader.best_grasp_SE3
-        np.testing.assert_array_almost_equal(
-            best_se3.translation, expected_grasp_pos)
+        np.testing.assert_array_almost_equal(best_se3.translation, expected_grasp_pos)
 
         # Mesh paths (check construction is correct)
-        assert loader.object_info.mesh_path.name == "cbb0cdd9bbcc4fdfa2e16db1db4cda61.obj"
+        assert (
+            loader.object_info.mesh_path.name == "cbb0cdd9bbcc4fdfa2e16db1db4cda61.obj"
+        )
         assert loader.object_info.texture_path.name == "material_0.png"
         # Note: mesh files may be in a different location, so we just check the filename
 
@@ -788,8 +784,7 @@ class TestRobotConfig:
             safety_threshold=0.02,
             dt=0.01,
             gripper_depth=0.1034,
-            T=15
-
+            T=15,
         )
 
         assert config.W_xREG == pytest.approx(0.001)
@@ -815,19 +810,19 @@ class TestRobotConfig:
             safety_threshold=6.0,
             dt=7.0,
             gripper_depth=8.0,
-            T=15
+            T=15,
         )
 
         # Verify all attributes are accessible
-        assert hasattr(config, 'W_xREG')
-        assert hasattr(config, 'W_uREG')
-        assert hasattr(config, 'W_gripper_pose')
-        assert hasattr(config, 'W_gripper_pose_term')
-        assert hasattr(config, 'W_limit')
-        assert hasattr(config, 'safety_threshold')
-        assert hasattr(config, 'dt')
-        assert hasattr(config, 'gripper_depth')
-        assert hasattr(config, 'T')
+        assert hasattr(config, "W_xREG")
+        assert hasattr(config, "W_uREG")
+        assert hasattr(config, "W_gripper_pose")
+        assert hasattr(config, "W_gripper_pose_term")
+        assert hasattr(config, "W_limit")
+        assert hasattr(config, "safety_threshold")
+        assert hasattr(config, "dt")
+        assert hasattr(config, "gripper_depth")
+        assert hasattr(config, "T")
 
 
 class TestConfigLoader:
@@ -837,21 +832,21 @@ class TestConfigLoader:
     def temp_config_file(self, tmp_path):
         """Create a temporary config YAML file"""
         config_data = {
-            'weights': {
-                'W_xREG': 0.001,
-                'W_uREG': 0.001,
-                'W_gripper_pose': 1000.0,
-                'W_gripper_pose_term': 100.0,
-                'W_limit': 100.0
+            "weights": {
+                "W_xREG": 0.001,
+                "W_uREG": 0.001,
+                "W_gripper_pose": 1000.0,
+                "W_gripper_pose_term": 100.0,
+                "W_limit": 100.0,
             },
-            'safety_threshold': 0.02,
-            'dt': 0.01,
-            'gripper_depth': 0.1034,
-            'T': 15
+            "safety_threshold": 0.02,
+            "dt": 0.01,
+            "gripper_depth": 0.1034,
+            "T": 15,
         }
 
         config_path = tmp_path / "test_config.yml"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             yaml.dump(config_data, f)
 
         return config_path
@@ -885,21 +880,21 @@ class TestConfigLoader:
         from object_following_ocp.data_loader import ConfigLoader
 
         config_data = {
-            'weights': {
-                'W_xREG': 0.01,
-                'W_uREG': 0.02,
-                'W_gripper_pose': 500.0,
-                'W_gripper_pose_term': 50.0,
-                'W_limit': 200.0
+            "weights": {
+                "W_xREG": 0.01,
+                "W_uREG": 0.02,
+                "W_gripper_pose": 500.0,
+                "W_gripper_pose_term": 50.0,
+                "W_limit": 200.0,
             },
-            'safety_threshold': 0.05,
-            'dt': 0.02,
-            'gripper_depth': 0.15,
-            'T': 10
+            "safety_threshold": 0.05,
+            "dt": 0.02,
+            "gripper_depth": 0.15,
+            "T": 10,
         }
 
         config_path = tmp_path / "custom_config.yml"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             yaml.dump(config_data, f)
 
         config = ConfigLoader.load(str(config_path))
@@ -925,7 +920,7 @@ class TestConfigLoader:
         from object_following_ocp.data_loader import ConfigLoader
 
         config_path = tmp_path / "invalid.yml"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             f.write("{ invalid yaml content [")
 
         with pytest.raises(yaml.YAMLError):
@@ -935,14 +930,10 @@ class TestConfigLoader:
         """Test ConfigLoader with missing weights section"""
         from object_following_ocp.data_loader import ConfigLoader
 
-        config_data = {
-            'safety_threshold': 0.02,
-            'dt': 0.01,
-            'gripper_depth': 0.1034
-        }
+        config_data = {"safety_threshold": 0.02, "dt": 0.01, "gripper_depth": 0.1034}
 
         config_path = tmp_path / "no_weights.yml"
-        with open(config_path, 'w') as f:
+        with open(config_path, "w") as f:
             yaml.dump(config_data, f)
 
         with pytest.raises(KeyError):
@@ -950,7 +941,7 @@ class TestConfigLoader:
 
     @pytest.mark.skipif(
         not pathlib.Path("/workspaces/object_following_ocp").exists(),
-        reason="Real config file not available in this environment"
+        reason="Real config file not available in this environment",
     )
     def test_config_loader_real_file(self):
         """Test ConfigLoader with the real config file"""
