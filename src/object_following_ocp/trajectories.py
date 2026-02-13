@@ -13,6 +13,10 @@ class TrajectorySE3:
     def __len__(self) -> int:
         return self.T
 
+    def __iter__(self):
+        """Make TrajectorySE3 iterable"""
+        return iter(self.poses)
+
     def __mul__(self, T: pin.SE3) -> "TrajectorySE3":
         return TrajectorySE3([p * T for p in self.poses])
 
@@ -30,6 +34,10 @@ class TrajectoryInConfigurationSpace:
 
     def __len__(self) -> int:
         return self.T
+
+    def __iter__(self):
+        """Make TrajectoryInConfigurationSpace iterable"""
+        return iter(self.configurations)
 
     def get_EE_poses(self, rmodel: pin.Model) -> list[pin.SE3]:
         poses = []
