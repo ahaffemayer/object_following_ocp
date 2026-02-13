@@ -1,4 +1,5 @@
-"""This visualization is to see the grasp pose in the robot frame (if the transformation of the camera to the robot is identity)."""
+"""This visualization is to see the trajectory of the object in the camera frame, in the right rotation.
+"""
 
 import pathlib
 
@@ -11,17 +12,12 @@ from object_following_ocp.robot_loader import load_reduced_panda
 
 if __name__ == "__main__":
     object_traj_path = pathlib.Path(
-        "/workspaces/object_following_ocp/ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
-    )
+        "/workspaces/object_following_ocp/ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json")
     scale_path = pathlib.Path(
-        "/workspaces/object_following_ocp/ressources/grasps_scales.json"
-    )
+        "/workspaces/object_following_ocp/ressources/grasps_scales.json")
 
-    dataloader = DataLoader(
-        object_trajectory_path=object_traj_path,
-        scales_path=scale_path,
-        load_grasps=True,
-    )
+    dataloader = DataLoader(object_trajectory_path=object_traj_path,
+                            scales_path=scale_path)
 
     object_trajectory_in_camera_frame = dataloader.to_trajectory_SE3()
 
@@ -32,6 +28,7 @@ if __name__ == "__main__":
 
     scene = Scene()
     object_info = dataloader.object_info
+
     # -----------------------------
     # Add object to scene (using paths from parser)
     # -----------------------------
@@ -45,21 +42,20 @@ if __name__ == "__main__":
     )
     scene.add_object(o)
 
-    best_grasp = dataloader.best_grasp_SE3
-    print(best_grasp)
-
     elev_angle_deg = 25
-    default_rot = pin.exp3(np.array([0, 0, np.deg2rad(90)])) @ pin.exp3(
-        np.array([-np.pi / 2 - np.deg2rad(elev_angle_deg), 0, 0])
-    )
+    default_rot = pin.exp3(np.array([0, 0, np.deg2rad(90)])) @ \
+        pin.exp3(np.array([-np.pi / 2 - np.deg2rad(elev_angle_deg), 0, 0]))
 
     SE3_rot = pin.SE3(default_rot, np.array([0, 0, 0]))
 
-    scene.add_object(Object.create_sphere(radius=0.01, name="target", color=[0, 0, 1]))
-    pose_data = object_trajectory_in_camera_frame[0]
+    for k, pose_data in enumerate(object_trajectory_in_camera_frame):
+        color = [0.0, 1.0, 0.0] if k == 0 else [0.5, 0.5, 0.5]
 
-    grasp_pose = SE3_rot * pose_data * best_grasp
-    scene["target"].pos[:] = grasp_pose.translation
+        scene.add_object(
+            Object.create_sphere(
+                radius=0.01, name=f"target_{k}", color=color)
+        )
+        scene[f"target_{k}"].pos[:] = (SE3_rot*pose_data).translation
 
-    o.pose = (SE3_rot * pose_data).homogeneous
-    input()
+        o.pose = (SE3_rot*pose_data).homogeneous
+        input()

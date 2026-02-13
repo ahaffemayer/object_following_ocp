@@ -1,6 +1,6 @@
 """Visualization of the offseted grasp trajectory in the robot frame (if the transformation of the camera to robot's world is identity).
 The offset comes from the fact that GraspGen gives a grasping pose for the TCP tool.
-The transforms are: 
+The transforms are:
 
 T_finalgrasp_world = T_finalgrasp_graspgen * T_graspgen_object * T_object_camera * T_camera_world
 
@@ -17,13 +17,17 @@ from object_following_ocp.robot_loader import load_reduced_panda
 
 if __name__ == "__main__":
     object_traj_path = pathlib.Path(
-        "/workspaces/object_following_ocp/ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json")
+        "/workspaces/object_following_ocp/ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
+    )
     scale_path = pathlib.Path(
-        "/workspaces/object_following_ocp/ressources/grasps_scales.json")
+        "/workspaces/object_following_ocp/ressources/grasps_scales.json"
+    )
 
-    dataloader = DataLoader(object_trajectory_path=object_traj_path,
-                            scales_path=scale_path,
-                            load_grasps=True)
+    dataloader = DataLoader(
+        object_trajectory_path=object_traj_path,
+        scales_path=scale_path,
+        load_grasps=True,
+    )
 
     object_trajectory_in_camera_frame = dataloader.to_trajectory_SE3()
 
@@ -50,6 +54,12 @@ if __name__ == "__main__":
 
     best_grasp = dataloader.best_grasp_SE3
 
+    elev_angle_deg = 25
+    default_rot = pin.exp3(np.array([0, 0, np.deg2rad(90)])) @ pin.exp3(
+        np.array([-np.pi / 2 - np.deg2rad(elev_angle_deg), 0, 0])
+    )
+    SE3_rot = pin.SE3(default_rot, np.array([0, 0, 0]))
+
     offset_transform = pin.SE3.Identity()
     gripper_depth = 0.1034
     offset_transform.translation = np.array([0, 0, gripper_depth])
@@ -57,12 +67,11 @@ if __name__ == "__main__":
         color = [0.0, 1.0, 0.0] if k == 0 else [0.5, 0.5, 0.5]
 
         scene.add_object(
-            Object.create_sphere(
-                radius=0.01, name=f"target_{k}", color=color)
+            Object.create_sphere(radius=0.01, name=f"target_{k}", color=color)
         )
 
-        grasp_pose = pose_data * best_grasp * offset_transform
+        grasp_pose = SE3_rot * pose_data * best_grasp * offset_transform
         scene[f"target_{k}"].pos[:] = grasp_pose.translation
 
-        o.pose = pose_data.homogeneous
+        o.pose = (SE3_rot * pose_data).homogeneous
         input()
