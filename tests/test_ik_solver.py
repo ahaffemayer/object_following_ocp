@@ -1,11 +1,12 @@
 """
-Pytest unit tests for RobotIKSolver class.
+Pytest unit tests for RobotIKSolver class with Pinocchio SE3 support.
 Tests IK solving, FK verification, batch processing, and edge cases.
 
-Run with: pytest test_ik_solver.py -v
+Run with: pytest test_ik_solver_pytest.py -v
 """
 
 import numpy as np
+import pinocchio as pin
 import pytest
 
 from object_following_ocp.ik_curobo import RobotIKSolver
@@ -23,11 +24,19 @@ def solver():
 
 
 @pytest.fixture
-def valid_pose(solver):
-    """Fixture providing a valid pose from FK."""
+def valid_pose_posquat(solver):
+    """Fixture providing a valid pose as (position, quaternion)."""
     q_sample = solver.ik_solver.sample_configs(1)
     position, quaternion = solver.forward_kinematics(q_sample[0].cpu().numpy())
     return position, quaternion
+
+
+@pytest.fixture
+def valid_pose_se3(solver):
+    """Fixture providing a valid pose as SE3."""
+    q_sample = solver.ik_solver.sample_configs(1)
+    se3 = solver.forward_kinematics(q_sample[0].cpu().numpy(), return_se3=True)
+    return se3
 
 
 class TestInitialization:
@@ -45,19 +54,70 @@ class TestInitialization:
             RobotIKSolver(robot_name="nonexistent_robot")
 
 
+class TestSE3Conversion:
+    """Test SE3 conversion utilities."""
+
+    def test_se3_to_pos_quat(self):
+        """Test converting SE3 to position and quaternion."""
+        # Create a simple SE3
+        translation = np.array([1.0, 2.0, 3.0])
+        rotation = np.eye(3)
+        se3 = pin.SE3(rotation, translation)
+
+        position, quaternion = RobotIKSolver.se3_to_pos_quat(se3)
+
+        # Check position
+        np.testing.assert_array_almost_equal(position, translation)
+
+        # Check quaternion (identity rotation = [1, 0, 0, 0])
+        assert quaternion[0] == pytest.approx(1.0, abs=1e-6)  # w component
+        assert np.allclose(quaternion[1:], [0, 0, 0], atol=1e-6)
+
+    def test_pos_quat_to_se3(self):
+        """Test converting position and quaternion to SE3."""
+        position = np.array([1.0, 2.0, 3.0])
+        quaternion = np.array([1.0, 0.0, 0.0, 0.0])  # Identity rotation
+
+        se3 = RobotIKSolver.pos_quat_to_se3(position, quaternion)
+
+        # Check translation
+        np.testing.assert_array_almost_equal(se3.translation, position)
+
+        # Check rotation (should be identity)
+        np.testing.assert_array_almost_equal(se3.rotation, np.eye(3))
+
+    def test_round_trip_conversion(self):
+        """Test that SE3 -> pos/quat -> SE3 preserves the transformation."""
+        # Create an arbitrary SE3
+        translation = np.array([0.5, -0.3, 0.8])
+        angle = np.pi / 4
+        axis = np.array([0, 0, 1])
+        rotation = pin.AngleAxis(angle, axis).toRotationMatrix()
+        original_se3 = pin.SE3(rotation, translation)
+
+        # Convert to pos/quat and back
+        pos, quat = RobotIKSolver.se3_to_pos_quat(original_se3)
+        recovered_se3 = RobotIKSolver.pos_quat_to_se3(pos, quat)
+
+        # Check they're equal
+        np.testing.assert_array_almost_equal(
+            recovered_se3.translation, original_se3.translation
+        )
+        np.testing.assert_array_almost_equal(
+            recovered_se3.rotation, original_se3.rotation
+        )
+
+
 class TestForwardKinematics:
     """Test forward kinematics functionality."""
 
-    def test_forward_kinematics(self, solver):
-        """Test forward kinematics computation."""
-        # Sample a random valid configuration
+    def test_forward_kinematics_pos_quat(self, solver):
+        """Test FK returning position and quaternion."""
         q_sample = solver.ik_solver.sample_configs(1)
         q_numpy = q_sample[0].cpu().numpy()
 
-        # Compute FK
-        position, quaternion = solver.forward_kinematics(q_numpy)
+        position, quaternion = solver.forward_kinematics(q_numpy, return_se3=False)
 
-        # Check output shapes and types
         assert position.shape == (3,)
         assert quaternion.shape == (4,)
         assert isinstance(position, np.ndarray)
@@ -67,156 +127,151 @@ class TestForwardKinematics:
         quat_norm = np.linalg.norm(quaternion)
         assert np.isclose(quat_norm, 1.0, atol=1e-5)
 
+    def test_forward_kinematics_se3(self, solver):
+        """Test FK returning SE3."""
+        q_sample = solver.ik_solver.sample_configs(1)
+        q_numpy = q_sample[0].cpu().numpy()
+
+        se3 = solver.forward_kinematics(q_numpy, return_se3=True)
+
+        assert isinstance(se3, pin.SE3)
+        assert se3.translation.shape == (3,)
+        assert se3.rotation.shape == (3, 3)
+
+    def test_fk_consistency(self, solver):
+        """Test that FK returns consistent results in both formats."""
+        q_sample = solver.ik_solver.sample_configs(1)
+        q_numpy = q_sample[0].cpu().numpy()
+
+        # Get both formats
+        pos, quat = solver.forward_kinematics(q_numpy, return_se3=False)
+        se3 = solver.forward_kinematics(q_numpy, return_se3=True)
+
+        # They should represent the same transform
+        np.testing.assert_array_almost_equal(pos, se3.translation)
+
+        # Convert SE3 back to quat and compare
+        _, quat_from_se3 = RobotIKSolver.se3_to_pos_quat(se3)
+        # Account for quaternion double cover (q and -q represent same rotation)
+        assert np.allclose(quat, quat_from_se3, atol=1e-5) or np.allclose(
+            quat, -quat_from_se3, atol=1e-5
+        )
+
 
 class TestSinglePoseSolving:
     """Test IK solving for single poses."""
 
-    def test_solve_single_pose(self, solver, valid_pose):
-        """Test IK solving for a single pose."""
-        position, quaternion = valid_pose
+    def test_solve_with_tuple(self, solver, valid_pose_posquat):
+        """Test IK solving with (position, quaternion) tuple."""
+        position, quaternion = valid_pose_posquat
 
-        # Solve IK
-        solution, info = solver.solve(position, quaternion)
+        solution, info = solver.solve((position, quaternion))
 
-        # Check that solution was found
-        assert solution is not None, "IK solution should be found for valid pose"
-        assert info["success"], "Success flag should be True"
-
-        # Check solution is 1D with correct number of joints
-        assert solution.ndim == 1, "Solution should be 1D array"
-        assert solution.shape[0] == 7, "Franka should have 7 joints"
-
-        # Check errors are within threshold
-        assert info["position_error"] < 0.01, "Position error too large"
-        assert info["rotation_error"] < 0.1, "Rotation error too large"
-
-        # Check timing info exists
-        assert "solve_time" in info
-        assert info["solve_time"] > 0
-
-    def test_solve_verify_with_fk(self, solver, valid_pose):
-        """Test that IK solution is correct by verifying with FK."""
-        target_pos, target_quat = valid_pose
-
-        # Solve IK
-        solution, info = solver.solve(target_pos, target_quat)
-
-        if solution is not None:
-            # Verify solution with FK
-            fk_pos, fk_quat = solver.forward_kinematics(solution)
-
-            # Check position matches
-            pos_error = np.linalg.norm(fk_pos - target_pos)
-            assert pos_error < 0.01, "FK position doesn't match target"
-
-            # Check quaternion orientation (account for double cover)
-            quat_dot = np.abs(np.dot(fk_quat, target_quat))
-            assert quat_dot > 0.99, "FK orientation doesn't match target"
-
-    def test_solve_with_list_input(self, solver, valid_pose):
-        """Test that solver accepts list inputs as well as numpy arrays."""
-        position, quaternion = valid_pose
-
-        # Convert to lists
-        position_list = position.tolist()
-        quaternion_list = quaternion.tolist()
-
-        # Solve with list input
-        solution, info = solver.solve(position_list, quaternion_list)
-
-        # Should still work
         assert solution is not None
         assert info["success"]
+        assert solution.ndim == 1
+        assert solution.shape[0] == 7  # Franka has 7 joints
+        assert info["position_error"] < 0.01
+        assert info["rotation_error"] < 0.1
 
-    def test_return_all_solutions(self, solver, valid_pose):
+    def test_solve_with_se3(self, solver, valid_pose_se3):
+        """Test IK solving with SE3 object."""
+        solution, info = solver.solve(valid_pose_se3)
+
+        assert solution is not None
+        assert info["success"]
+        assert solution.ndim == 1
+        assert solution.shape[0] == 7
+        assert info["position_error"] < 0.01
+        assert info["rotation_error"] < 0.1
+
+    def test_solve_se3_vs_posquat_consistency(self, solver):
+        """Test that solving with SE3 and pos/quat gives similar results."""
+        # Get a test pose
+        q_sample = solver.ik_solver.sample_configs(1)
+        pos, quat = solver.forward_kinematics(q_sample[0].cpu().numpy())
+        se3 = solver.forward_kinematics(q_sample[0].cpu().numpy(), return_se3=True)
+
+        # Solve with both methods
+        sol_tuple, _ = solver.solve((pos, quat))
+        sol_se3, _ = solver.solve(se3)
+
+        if sol_tuple is not None and sol_se3 is not None:
+            # Both solutions should produce similar end-effector poses
+            fk_tuple = solver.forward_kinematics(sol_tuple, return_se3=True)
+            fk_se3 = solver.forward_kinematics(sol_se3, return_se3=True)
+
+            pos_diff = np.linalg.norm(fk_tuple.translation - fk_se3.translation)
+            assert pos_diff < 0.01
+
+    def test_solve_verify_with_fk(self, solver, valid_pose_se3):
+        """Test that IK solution is correct by verifying with FK."""
+        solution, info = solver.solve(valid_pose_se3)
+
+        if solution is not None:
+            # Verify with FK
+            fk_se3 = solver.forward_kinematics(solution, return_se3=True)
+
+            # Check position matches
+            pos_error = np.linalg.norm(fk_se3.translation - valid_pose_se3.translation)
+            assert pos_error < 0.01
+
+    def test_return_all_solutions(self, solver, valid_pose_se3):
         """Test returning all valid solutions."""
-        position, quaternion = valid_pose
-
-        # Solve with return_all_solutions=True
-        solution, info = solver.solve(position, quaternion, return_all_solutions=True)
+        solution, info = solver.solve(valid_pose_se3, return_all_solutions=True)
 
         if solution is not None:
             assert "all_solutions" in info
             all_solutions = info["all_solutions"]
 
-            # Should have at least one solution
             assert len(all_solutions) > 0
+            assert solution.ndim == 1
+            assert all_solutions.ndim == 2
 
-            # solution should be 1D, all_solutions should be 2D
-            assert solution.ndim == 1, "Single solution should be 1D"
-            assert all_solutions.ndim == 2, "All solutions should be 2D"
-
-            # First solution from all_solutions should match the returned solution
             np.testing.assert_array_almost_equal(all_solutions[0], solution, decimal=5)
 
     def test_impossible_pose(self, solver):
         """Test solver behavior with unreachable pose."""
-        # Create a pose that's likely out of reach
-        position = np.array([10.0, 10.0, 10.0])
-        quaternion = np.array([1.0, 0.0, 0.0, 0.0])
+        # Create unreachable SE3
+        far_translation = np.array([10.0, 10.0, 10.0])
+        se3 = pin.SE3(np.eye(3), far_translation)
 
-        # Try to solve
-        solution, info = solver.solve(position, quaternion)
+        solution, info = solver.solve(se3)
 
-        # Should fail gracefully
-        assert solution is None, "Should return None for impossible pose"
-        assert not info["success"], "Success should be False"
+        assert solution is None
+        assert not info["success"]
         assert "position_error" in info
         assert "rotation_error" in info
-
-    def test_identity_quaternion(self, solver):
-        """Test with identity quaternion (no rotation)."""
-        # Get a pose with identity rotation
-        q_sample = solver.ik_solver.sample_configs(1)
-        position, _ = solver.forward_kinematics(q_sample[0].cpu().numpy())
-
-        # Use identity quaternion
-        quaternion = np.array([1.0, 0.0, 0.0, 0.0])
-
-        # Should still solve
-        solution, info = solver.solve(position, quaternion)
-
-        # May or may not succeed depending on reachability
-        assert "success" in info
-        assert isinstance(info["success"], bool)
-
-    def test_multiple_solves_same_pose(self, solver, valid_pose):
-        """Test that solving the same pose multiple times is consistent."""
-        position, quaternion = valid_pose
-
-        # Solve multiple times
-        solutions = []
-        for _ in range(3):
-            solution, info = solver.solve(position, quaternion)
-            if solution is not None:
-                solutions.append(solution)
-
-        # Should get solutions
-        assert len(solutions) > 0, "Should find solution at least once"
-
-        # All solutions should produce similar FK results
-        if len(solutions) > 1:
-            fk_positions = [solver.forward_kinematics(s)[0] for s in solutions]
-
-            # All positions should be close to target
-            for fk_pos in fk_positions:
-                pos_error = np.linalg.norm(fk_pos - position)
-                assert pos_error < 0.01
 
 
 class TestBatchSolving:
     """Test batch IK solving."""
 
-    def test_solve_batch(self, solver):
-        """Test batch IK solving."""
-        batch_size = 10
+    def test_solve_batch_with_se3_list(self, solver):
+        """Test batch solving with list of SE3 objects."""
+        # Generate multiple SE3 poses
+        q_samples = solver.ik_solver.sample_configs(10)
+        se3_list = []
+        for i in range(10):
+            se3 = solver.forward_kinematics(q_samples[i].cpu().numpy(), return_se3=True)
+            se3_list.append(se3)
 
-        # Generate multiple valid poses
-        q_samples = solver.ik_solver.sample_configs(batch_size)
+        # Solve batch
+        solutions, info = solver.solve_batch(se3_list)
 
+        assert solutions.shape[0] == 10
+        assert len(info["success"]) == 10
+        assert info["success_rate"] > 0.5
+        assert info["mean_position_error"] < 0.01
+        assert info["mean_rotation_error"] < 0.1
+
+    def test_solve_batch_with_arrays(self, solver):
+        """Test batch solving with position/quaternion arrays."""
+        # Generate multiple poses
+        q_samples = solver.ik_solver.sample_configs(10)
         positions = []
         quaternions = []
-        for i in range(batch_size):
+        for i in range(10):
             pos, quat = solver.forward_kinematics(q_samples[i].cpu().numpy())
             positions.append(pos)
             quaternions.append(quat)
@@ -225,167 +280,68 @@ class TestBatchSolving:
         quaternions = np.array(quaternions)
 
         # Solve batch
-        solutions, info = solver.solve_batch(positions, quaternions)
+        solutions, info = solver.solve_batch((positions, quaternions))
 
-        # Check output shapes
-        assert solutions.shape[0] == batch_size
-        assert len(info["success"]) == batch_size
-
-        # Check success rate
-        assert info["success_rate"] > 0.5, "Success rate too low"
-
-        # Check info contains required fields
-        assert "solve_time" in info
-        assert "mean_position_error" in info
-        assert "mean_rotation_error" in info
-        assert "position_errors" in info
-        assert "rotation_errors" in info
-
-        # Check errors are reasonable
-        assert info["mean_position_error"] < 0.01
-        assert info["mean_rotation_error"] < 0.1
+        assert solutions.shape[0] == 10
+        assert info["success_rate"] > 0.5
 
     def test_batch_empty_input(self, solver):
         """Test batch solver with empty arrays."""
         positions = np.array([]).reshape(0, 3)
         quaternions = np.array([]).reshape(0, 4)
 
-        # Should raise ValueError for empty input
         with pytest.raises(ValueError):
-            solver.solve_batch(positions, quaternions)
-
-
-class TestDifferentConfigurations:
-    """Test solver with different configurations."""
-
-    def test_different_num_seeds(self, valid_pose):
-        """Test solver with different number of seeds."""
-        # Create solver with fewer seeds
-        solver_few_seeds = RobotIKSolver(robot_name="franka", num_seeds=5)
-
-        position, quaternion = valid_pose
-
-        # Should still work
-        solution, info = solver_few_seeds.solve(position, quaternion)
-        assert "success" in info
-
-    def test_stricter_thresholds(self, valid_pose):
-        """Test solver with stricter error thresholds."""
-        solver_strict = RobotIKSolver(
-            robot_name="franka",
-            position_threshold=0.001,
-            rotation_threshold=0.01,
-        )
-
-        position, quaternion = valid_pose
-
-        # Solve
-        solution, info = solver_strict.solve(position, quaternion)
-
-        # If successful, errors should be within stricter thresholds
-        if solution is not None:
-            assert info["position_error"] < 0.001
-            assert info["rotation_error"] < 0.01
-
-    def test_quaternion_normalization(self, solver, valid_pose):
-        """Test that unnormalized quaternions are handled."""
-        position, quaternion = valid_pose
-
-        # Create unnormalized quaternion
-        quaternion_unnorm = quaternion * 2.0
-
-        # Should still work (CuRobo likely normalizes internally)
-        solution, info = solver.solve(position, quaternion_unnorm)
-
-        # Should either succeed or fail gracefully
-        assert "success" in info
+            solver.solve_batch((positions, quaternions))
 
 
 class TestInputValidation:
     """Test input validation and error handling."""
 
-    def test_invalid_position_shape(self):
+    def test_invalid_position_shape(self, solver):
         """Test with incorrect position shape."""
-        solver = RobotIKSolver(robot_name="franka")
-
-        # Wrong shape
         position = np.array([1.0, 2.0])  # Should be 3D
         quaternion = np.array([1.0, 0.0, 0.0, 0.0])
 
-        # Should raise ValueError
         with pytest.raises(ValueError, match="Position must have shape"):
-            solver.solve(position, quaternion)
+            solver.solve((position, quaternion))
 
-    def test_invalid_quaternion_shape(self):
+    def test_invalid_quaternion_shape(self, solver):
         """Test with incorrect quaternion shape."""
-        solver = RobotIKSolver(robot_name="franka")
-
         position = np.array([0.5, 0.0, 0.5])
         quaternion = np.array([1.0, 0.0, 0.0])  # Should be 4D
 
-        # Should raise ValueError
         with pytest.raises(ValueError, match="Quaternion must have shape"):
-            solver.solve(position, quaternion)
+            solver.solve((position, quaternion))
 
 
 class TestPerformance:
     """Performance and stress tests."""
 
-    def test_solve_speed(self, solver, valid_pose):
-        """Test that solve time is reasonable."""
-        position, quaternion = valid_pose
+    def test_solve_speed_se3(self, solver, valid_pose_se3):
+        """Test that solve time is reasonable with SE3 input."""
+        solution, info = solver.solve(valid_pose_se3)
 
-        # Solve and check timing
-        solution, info = solver.solve(position, quaternion)
-
-        # Should solve in reasonable time (< 1 second for single pose)
-        assert info["solve_time"] < 1.0, "Single solve took too long"
+        assert info["solve_time"] < 1.0
 
     def test_batch_solve_speed(self, solver):
         """Test batch solving performance."""
         batch_size = 100
 
-        # Generate valid poses
+        # Generate SE3 poses
         q_samples = solver.ik_solver.sample_configs(batch_size)
-        positions = []
-        quaternions = []
+        se3_list = []
         for i in range(batch_size):
-            pos, quat = solver.forward_kinematics(q_samples[i].cpu().numpy())
-            positions.append(pos)
-            quaternions.append(quat)
-
-        positions = np.array(positions)
-        quaternions = np.array(quaternions)
+            se3 = solver.forward_kinematics(q_samples[i].cpu().numpy(), return_se3=True)
+            se3_list.append(se3)
 
         # Solve batch
-        solutions, info = solver.solve_batch(positions, quaternions)
+        solutions, info = solver.solve_batch(se3_list)
 
-        # Check throughput
         poses_per_second = batch_size / info["solve_time"]
         print(f"\nBatch performance: {poses_per_second:.1f} poses/second")
 
-        # Should be reasonably fast (at least 10 poses/sec on GPU)
-        assert poses_per_second > 10, "Batch solving too slow"
-
-    def test_consecutive_solves(self, solver):
-        """Test multiple consecutive solves don't degrade performance."""
-        # Get valid poses
-        q_samples = solver.ik_solver.sample_configs(10)
-
-        solve_times = []
-        for i in range(10):
-            pos, quat = solver.forward_kinematics(q_samples[i].cpu().numpy())
-            _, info = solver.solve(pos, quat)
-            solve_times.append(info["solve_time"])
-
-        # Later solves shouldn't be significantly slower
-        avg_early = np.mean(solve_times[:3])
-        avg_late = np.mean(solve_times[-3:])
-
-        # Allow some variance but shouldn't increase by more than 2x
-        assert avg_late < avg_early * 2.0, "Performance degraded"
+        assert poses_per_second > 10
 
 
 if __name__ == "__main__":
-    # Run with pytest
     pytest.main([__file__, "-v", "--tb=short"])

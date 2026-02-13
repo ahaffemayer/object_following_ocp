@@ -5,9 +5,10 @@ Provides a simple interface for inverse kinematics given a robot name and target
 
 # Standard Library
 import time
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
+import pinocchio as pin
 
 # Third Party
 import torch
@@ -84,18 +85,58 @@ class RobotIKSolver:
         # Initialize IK solver
         self.ik_solver = IKSolver(ik_config)
 
+    @staticmethod
+    def se3_to_pos_quat(se3: pin.SE3) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Convert Pinocchio SE3 to position and quaternion.
+
+        Args:
+            se3: Pinocchio SE3 object
+
+        Returns:
+            Tuple of (position, quaternion) where:
+                - position: [x, y, z]
+                - quaternion: [w, x, y, z]
+        """
+        position = se3.translation
+        # Pinocchio quaternion is [x, y, z, w], CuRobo expects [w, x, y, z]
+        quat_xyzw = pin.Quaternion(se3.rotation).coeffs()
+        quaternion = np.array([quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]])
+        return position, quaternion
+
+    @staticmethod
+    def pos_quat_to_se3(position: np.ndarray, quaternion: np.ndarray) -> pin.SE3:
+        """
+        Convert position and quaternion to Pinocchio SE3.
+
+        Args:
+            position: [x, y, z]
+            quaternion: [w, x, y, z]
+
+        Returns:
+            Pinocchio SE3 object
+        """
+        # Convert quaternion from [w, x, y, z] to [x, y, z, w] for Pinocchio
+        quat_xyzw = np.array(
+            [quaternion[1], quaternion[2], quaternion[3], quaternion[0]]
+        )
+        quat = pin.Quaternion(quat_xyzw)
+        return pin.SE3(quat.toRotationMatrix(), position)
+
     def solve(
         self,
-        position: np.ndarray,
-        quaternion: np.ndarray,
+        target_pose: Union[pin.SE3, Tuple[np.ndarray, np.ndarray]],
         return_all_solutions: bool = False,
     ) -> Tuple[Optional[np.ndarray], dict]:
         """
         Solve inverse kinematics for a target end-effector pose.
 
         Args:
-            position: Target position as [x, y, z] in meters
-            quaternion: Target orientation as [w, x, y, z] quaternion
+            target_pose: Either:
+                - Pinocchio SE3 object, or
+                - Tuple of (position, quaternion) where:
+                    - position: [x, y, z] in meters
+                    - quaternion: [w, x, y, z]
             return_all_solutions: If True, return all valid solutions (default: False)
 
         Returns:
@@ -110,6 +151,12 @@ class RobotIKSolver:
                     - 'all_solutions': 2D array of all valid solutions (shape: (n_solutions, n_joints))
                       only present if return_all_solutions=True
         """
+        # Handle different input types
+        if isinstance(target_pose, pin.SE3):
+            position, quaternion = self.se3_to_pos_quat(target_pose)
+        else:
+            position, quaternion = target_pose
+
         # Convert to numpy arrays if lists
         position = np.asarray(position, dtype=np.float32)
         quaternion = np.asarray(quaternion, dtype=np.float32)
@@ -170,23 +217,43 @@ class RobotIKSolver:
             return None, info
 
     def solve_batch(
-        self, positions: np.ndarray, quaternions: np.ndarray
+        self, target_poses: Union[list, Tuple[np.ndarray, np.ndarray]]
     ) -> Tuple[np.ndarray, dict]:
         """
         Solve inverse kinematics for multiple target poses in batch.
 
         Args:
-            positions: Target positions as Nx3 array
-            quaternions: Target orientations as Nx4 array (w, x, y, z)
+            target_poses: Either:
+                - List of Pinocchio SE3 objects, or
+                - Tuple of (positions, quaternions) where:
+                    - positions: Nx3 array of positions
+                    - quaternions: Nx4 array of quaternions (w, x, y, z)
 
         Returns:
             Tuple of (joint_configurations, info_dict) where:
                 - joint_configurations: NxDOF array of joint angles
                 - info_dict: Dictionary with batch solve information
         """
-        # Convert to numpy arrays if needed
-        positions = np.asarray(positions, dtype=np.float32)
-        quaternions = np.asarray(quaternions, dtype=np.float32)
+        # Handle different input types
+        if (
+            isinstance(target_poses, list)
+            and len(target_poses) > 0
+            and isinstance(target_poses[0], pin.SE3)
+        ):
+            # Convert list of SE3 to arrays
+            positions = []
+            quaternions = []
+            for se3 in target_poses:
+                pos, quat = self.se3_to_pos_quat(se3)
+                positions.append(pos)
+                quaternions.append(quat)
+            positions = np.array(positions, dtype=np.float32)
+            quaternions = np.array(quaternions, dtype=np.float32)
+        else:
+            positions, quaternions = target_poses
+            # Convert to numpy arrays if needed
+            positions = np.asarray(positions, dtype=np.float32)
+            quaternions = np.asarray(quaternions, dtype=np.float32)
 
         # Validate input shapes
         if len(positions) == 0:
@@ -237,16 +304,18 @@ class RobotIKSolver:
         return solutions, info
 
     def forward_kinematics(
-        self, joint_config: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, joint_config: np.ndarray, return_se3: bool = False
+    ) -> Union[Tuple[np.ndarray, np.ndarray], pin.SE3]:
         """
         Compute forward kinematics for given joint configuration.
 
         Args:
             joint_config: Joint angles array
+            return_se3: If True, return Pinocchio SE3 object instead of (position, quaternion)
 
         Returns:
-            Tuple of (position, quaternion) of end-effector
+            If return_se3=False: Tuple of (position, quaternion) of end-effector
+            If return_se3=True: Pinocchio SE3 object
         """
         q_tensor = torch.tensor(
             joint_config, device=self.tensor_args.device, dtype=torch.float32
@@ -260,11 +329,18 @@ class RobotIKSolver:
         position = kin_state.ee_position[0].cpu().numpy()
         quaternion = kin_state.ee_quaternion[0].cpu().numpy()
 
-        return position, quaternion
+        if return_se3:
+            return self.pos_quat_to_se3(position, quaternion)
+        else:
+            return position, quaternion
 
 
 def demo():
-    """Demonstration of the RobotIKSolver class."""
+    """Demonstration of the RobotIKSolver class with both SE3 and position/quaternion."""
+    print("=" * 70)
+    print("RobotIKSolver Demo")
+    print("=" * 70)
+
     # Initialize solver for Franka robot
     solver = RobotIKSolver(
         robot_name="franka",
@@ -276,30 +352,67 @@ def demo():
 
     # Sample a random configuration and get its FK
     q_sample = solver.ik_solver.sample_configs(1)
-    position, quaternion = solver.forward_kinematics(q_sample[0].cpu().numpy())
 
+    print("\n--- Example 1: Using Position + Quaternion ---")
+    position, quaternion = solver.forward_kinematics(q_sample[0].cpu().numpy())
     print(f"Target position: {position}")
     print(f"Target quaternion: {quaternion}")
 
-    # Solve IK for this pose
-    solution, info = solver.solve(position, quaternion)
+    # Solve IK using tuple input
+    solution1, info1 = solver.solve((position, quaternion))
 
-    if solution is not None:
+    if solution1 is not None:
         print("\nIK Solution found!")
-        print(f"Joint configuration: {solution}")
-        print(f"Position error: {info['position_error']:.6f} m")
-        print(f"Rotation error: {info['rotation_error']:.6f} rad")
-        print(f"Solve time: {info['solve_time']:.6f} s")
+        print(f"Joint configuration: {solution1}")
+        print(f"Position error: {info1['position_error']:.6f} m")
+        print(f"Rotation error: {info1['rotation_error']:.6f} rad")
+        print(f"Solve time: {info1['solve_time']:.6f} s")
 
-        # Verify solution with FK
-        fk_pos, fk_quat = solver.forward_kinematics(solution)
-        print("\nVerification (FK of solution):")
-        print(f"Position: {fk_pos}")
-        print(f"Quaternion: {fk_quat}")
-    else:
-        print("IK solution not found!")
-        print(f"Position error: {info['position_error']:.6f} m")
-        print(f"Rotation error: {info['rotation_error']:.6f} rad")
+    print("\n--- Example 2: Using Pinocchio SE3 ---")
+    target_se3 = solver.forward_kinematics(q_sample[0].cpu().numpy(), return_se3=True)
+    print("Target SE3:")
+    print(f"  Translation: {target_se3.translation}")
+    print(f"  Rotation:\n{target_se3.rotation}")
+
+    # Solve IK using SE3 input
+    solution2, info2 = solver.solve(target_se3)
+
+    if solution2 is not None:
+        print("\nIK Solution found!")
+        print(f"Joint configuration: {solution2}")
+        print(f"Position error: {info2['position_error']:.6f} m")
+        print(f"Rotation error: {info2['rotation_error']:.6f} rad")
+        print(f"Solve time: {info2['solve_time']:.6f} s")
+
+        # Verify solution with FK returning SE3
+        fk_se3 = solver.forward_kinematics(solution2, return_se3=True)
+        print("\nVerification (FK of solution as SE3):")
+        print(f"  Translation: {fk_se3.translation}")
+
+        # Check if SE3 transformations match
+        se3_error = np.linalg.norm(target_se3.translation - fk_se3.translation)
+        print(f"\nSE3 translation error: {se3_error:.6f} m")
+
+    print("\n--- Example 3: Batch Solving with SE3 ---")
+    # Generate multiple poses
+    q_samples = solver.ik_solver.sample_configs(5)
+    target_se3_list = []
+    for i in range(5):
+        se3 = solver.forward_kinematics(q_samples[i].cpu().numpy(), return_se3=True)
+        target_se3_list.append(se3)
+
+    # Solve batch with SE3 list
+    solutions, info = solver.solve_batch(target_se3_list)
+
+    print("Batch solve results:")
+    print(f"  Number of poses: {len(target_se3_list)}")
+    print(f"  Success rate: {info['success_rate']:.1%}")
+    print(f"  Mean position error: {info['mean_position_error']:.6f} m")
+    print(f"  Mean rotation error: {info['mean_rotation_error']:.6f} rad")
+    print(f"  Total solve time: {info['solve_time']:.6f} s")
+    print(f"  Time per pose: {info['solve_time_per_pose']:.6f} s")
+
+    print("\n" + "=" * 70)
 
 
 if __name__ == "__main__":
