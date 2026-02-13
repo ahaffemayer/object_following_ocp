@@ -115,7 +115,7 @@ class DataLoader:
             scale = obj_info_dict["scale"]
 
         # Mesh path (stored in the parent folder of the trajs, in the directory mesh/id/id.json)
-        mesh_path = object_trajectory_path.parent / \
+        mesh_path = object_trajectory_path.parent.parent / \
             "meshes" / f"{mesh_id}" / f"{mesh_id}.obj"
         # Texture path (same folder but different name)
         texture_path = mesh_path.parent / "material_0.png"

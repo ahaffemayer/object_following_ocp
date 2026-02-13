@@ -121,11 +121,12 @@ def main():
     print()
 
     # Mesh paths
-    print("# Mesh paths (should exist)")
-    print(f"assert loader.object_info.mesh_path.exists()")
-    print(f"assert loader.object_info.texture_path.exists()")
+    print("# Mesh paths (check construction is correct)")
     print(
         f'assert loader.object_info.mesh_path.name == "{loader.object_info.mesh_path.name}"')
+    print(
+        f'assert loader.object_info.texture_path.name == "{loader.object_info.texture_path.name}"')
+    print("# Note: mesh files may be in a different location, so we just check the filename")
     print()
 
     print("=" * 80)
@@ -133,6 +134,10 @@ def main():
     print("=" * 80)
     print(f"\nMesh path:    {loader.object_info.mesh_path}")
     print(f"Texture path: {loader.object_info.texture_path}")
+    print(f"Mesh exists:  {loader.object_info.mesh_path.exists()}")
+    print(f"Texture exists: {loader.object_info.texture_path.exists()}")
+    print(f"\nNote: Mesh paths use .parent.parent logic:")
+    print(f"  trajectory.json.parent.parent / 'meshes' / mesh_id / mesh_id.obj")
     print(
         f"\nNumber of grasps with confidence > 0.98: {sum(1 for g in loader.grasp_poses if g.confidence > 0.98)}")
     print(

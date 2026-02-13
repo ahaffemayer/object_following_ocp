@@ -278,10 +278,15 @@ class TestDataLoader:
             json.dump(scales_data, f)
 
         # Create mesh directory structure
-        mesh_dir = tmp_path / "meshes" / "0d0d1c59b0474d2ea92ce2e172c9f56a"
-        mesh_dir.mkdir(parents=True)
-        (mesh_dir / "0d0d1c59b0474d2ea92ce2e172c9f56a.obj").touch()
-        (mesh_dir / "material_0.png").touch()
+        # With .parent.parent: traj_path.parent.parent / "meshes"
+        # traj_path = tmp_path/trajectory.json
+        # .parent = tmp_path
+        # .parent.parent = tmp_path's parent
+        mesh_base_dir = traj_path.parent.parent / \
+            "meshes" / "0d0d1c59b0474d2ea92ce2e172c9f56a"
+        mesh_base_dir.mkdir(parents=True, exist_ok=True)
+        (mesh_base_dir / "0d0d1c59b0474d2ea92ce2e172c9f56a.obj").touch()
+        (mesh_base_dir / "material_0.png").touch()
 
         return {
             "trajectory": traj_path,
@@ -338,9 +343,14 @@ class TestDataLoader:
             scales_path=temp_files["scales"]
         )
 
-        expected_mesh = temp_files["tmp_path"] / "meshes" / \
+        # With .parent.parent:
+        # temp_files["trajectory"] = tmp_path/trajectory.json
+        # .parent = tmp_path
+        # .parent.parent = tmp_path's parent
+        # Then /meshes/ is added
+        expected_mesh = temp_files["trajectory"].parent.parent / "meshes" / \
             "0d0d1c59b0474d2ea92ce2e172c9f56a" / "0d0d1c59b0474d2ea92ce2e172c9f56a.obj"
-        expected_texture = temp_files["tmp_path"] / "meshes" / \
+        expected_texture = temp_files["trajectory"].parent.parent / "meshes" / \
             "0d0d1c59b0474d2ea92ce2e172c9f56a" / "material_0.png"
 
         assert loader.object_info.mesh_path == expected_mesh
@@ -418,9 +428,9 @@ class TestDataLoader:
         with open(scales_path, "w") as f:
             json.dump([], f)
 
-        # Create mesh directory
-        mesh_dir = tmp_path / "meshes" / "mesh1"
-        mesh_dir.mkdir(parents=True)
+        # Create mesh directory using .parent.parent logic
+        mesh_dir = traj_path.parent.parent / "meshes" / "mesh1"
+        mesh_dir.mkdir(parents=True, exist_ok=True)
 
         with pytest.raises(ValueError, match="Expected 1 object per file"):
             DataLoader(traj_path, grasp_path, scales_path)
@@ -456,9 +466,9 @@ class TestDataLoader:
         with open(scales_path, "w") as f:
             json.dump(scales_data, f)
 
-        # Create mesh directory
-        mesh_dir = tmp_path / "meshes" / "unknown_mesh_id"
-        mesh_dir.mkdir(parents=True)
+        # Create mesh directory using .parent.parent logic
+        mesh_dir = traj_path.parent.parent / "meshes" / "unknown_mesh_id"
+        mesh_dir.mkdir(parents=True, exist_ok=True)
         (mesh_dir / "unknown_mesh_id.obj").touch()
         (mesh_dir / "material_0.png").touch()
 
