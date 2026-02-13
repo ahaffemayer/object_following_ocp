@@ -1,6 +1,6 @@
-"""This visualization is to see the trajectory of the object in the camera frame.
-"""
 
+""" This visualization is to see the grasp pose in the robot frame (if the transformation of the camera to the robot is identity).
+"""
 import pathlib
 
 from robomeshcat import Object, Scene
@@ -15,7 +15,8 @@ if __name__ == "__main__":
         "/workspaces/object_following_ocp/ressources/grasps_scales.json")
 
     dataloader = DataLoader(object_trajectory_path=object_traj_path,
-                            scales_path=scale_path)
+                            scales_path=scale_path,
+                            load_grasps=True)
 
     object_trajectory_in_camera_frame = dataloader.to_trajectory_SE3()
 
@@ -26,7 +27,6 @@ if __name__ == "__main__":
 
     scene = Scene()
     object_info = dataloader.object_info
-
     # -----------------------------
     # Add object to scene (using paths from parser)
     # -----------------------------
@@ -40,14 +40,17 @@ if __name__ == "__main__":
     )
     scene.add_object(o)
 
-    for k, pose_data in enumerate(object_trajectory_in_camera_frame):
-        color = [0.0, 1.0, 0.0] if k == 0 else [0.5, 0.5, 0.5]
+    best_grasp = dataloader.best_grasp_SE3
+    print(best_grasp)
 
-        scene.add_object(
-            Object.create_sphere(
-                radius=0.01, name=f"target_{k}", color=color)
-        )
-        scene[f"target_{k}"].pos[:] = pose_data.translation
+    scene.add_object(
+        Object.create_sphere(
+            radius=0.01, name="target", color=[0, 0, 1])
+    )
+    pose_data = object_trajectory_in_camera_frame[0]
 
-        o.pose = pose_data.homogeneous
-        input()
+    grasp_pose = pose_data * best_grasp
+    scene["target"].pos[:] = grasp_pose.translation
+
+    o.pose = pose_data.homogeneous
+    input()
