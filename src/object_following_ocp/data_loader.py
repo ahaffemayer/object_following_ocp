@@ -67,21 +67,34 @@ class DataLoader:
     def __init__(
         self,
         object_trajectory_path: pathlib.Path,
-        grasp_poses_SE3_path: pathlib.Path,
-        scales_path: pathlib.Path
+        scales_path: pathlib.Path,
+        grasp_poses_SE3_path: Optional[pathlib.Path] = None,
+        load_grasps: bool = False,
+        grasps_directory: Optional[pathlib.Path] = None,
     ) -> None:
         """
-        Load a single object trajectory with its grasp poses.
+        Load a single object trajectory with optional grasp poses.
 
         Args:
             object_trajectory_path: Path to object trajectory JSON file
-            grasp_poses_SE3_path: Path to grasp poses YAML file
             scales_path: Path to scales JSON file (contains all objects)
+            grasp_poses_SE3_path: Path to grasp poses YAML file (optional, takes precedence)
+            load_grasps: If True and grasp_poses_SE3_path is None, auto-load grasps based on mesh_id
+            grasps_directory: Directory containing grasp files (default: trajectory_path/../../filtered_grasps/)
 
         Usage:
-            loader = DataLoader(traj_path, grasp_path, scales_path)
-            trajectory = loader.to_trajectory_SE3()
-            best_grasp = loader.best_grasp
+            # Without grasps
+            loader = DataLoader(traj_path, scales_path)
+
+            # With explicit grasp path
+            loader = DataLoader(traj_path, scales_path, grasp_path)
+
+            # With auto-loaded grasps
+            loader = DataLoader(traj_path, scales_path, load_grasps=True)
+
+            # With custom grasps directory
+            loader = DataLoader(traj_path, scales_path, load_grasps=True, 
+                              grasps_directory=Path("custom/grasps/dir"))
         """
         # --- Load scales first (contains ALL objects) ---
         with open(scales_path, "r") as f:
@@ -114,7 +127,7 @@ class DataLoader:
         else:
             scale = obj_info_dict["scale"]
 
-        # Mesh path (stored in the parent folder of the trajs, in the directory mesh/id/id.json)
+        # Mesh path (stored in the parent folder of the trajs, in the directory meshes/id/id.obj)
         mesh_path = object_trajectory_path.parent.parent / \
             "meshes" / f"{mesh_id}" / f"{mesh_id}.obj"
         # Texture path (same folder but different name)
@@ -142,25 +155,51 @@ class DataLoader:
             )
             self.poses.append(pose)
 
-        # --- Load grasp poses ---
-        with open(grasp_poses_SE3_path, "r") as f:
-            grasp_data = yaml.safe_load(f)
-
+        # --- Load grasp poses (optional) ---
         self.grasp_poses: list[GraspPose] = []
-        for grasp_name, grasp_info in grasp_data["grasps"].items():
-            orientation_data = grasp_info["orientation"]
-            grasp = GraspPose(
-                name=grasp_name,
-                confidence=grasp_info["confidence"],
-                position=np.array(grasp_info["position"]),
-                orientation=np.array([
-                    orientation_data["w"],
-                    orientation_data["xyz"][0],
-                    orientation_data["xyz"][1],
-                    orientation_data["xyz"][2]
-                ])
-            )
-            self.grasp_poses.append(grasp)
+
+        # Determine grasp file path
+        grasp_file_path = None
+
+        if grasp_poses_SE3_path is not None:
+            # Explicit path provided
+            grasp_file_path = grasp_poses_SE3_path
+        elif load_grasps:
+            # Auto-load based on mesh_id
+            if grasps_directory is None:
+                # Default: trajectory_path/../../filtered_grasps/
+                grasps_directory = object_trajectory_path.parent.parent / "filtered_grasps"
+
+            grasp_file_path = grasps_directory / f"{mesh_id}_filtered.yml"
+
+            if not grasp_file_path.exists():
+                # Try without _filtered suffix
+                grasp_file_path = grasps_directory / f"{mesh_id}.yml"
+
+                if not grasp_file_path.exists():
+                    print(
+                        f"Warning: Grasp file not found for mesh_id '{mesh_id}' in {grasps_directory}")
+                    grasp_file_path = None
+
+        # Load grasps if path was determined
+        if grasp_file_path is not None and grasp_file_path.exists():
+            with open(grasp_file_path, "r") as f:
+                grasp_data = yaml.safe_load(f)
+
+            for grasp_name, grasp_info in grasp_data["grasps"].items():
+                orientation_data = grasp_info["orientation"]
+                grasp = GraspPose(
+                    name=grasp_name,
+                    confidence=grasp_info["confidence"],
+                    position=np.array(grasp_info["position"]),
+                    orientation=np.array([
+                        orientation_data["w"],
+                        orientation_data["xyz"][0],
+                        orientation_data["xyz"][1],
+                        orientation_data["xyz"][2]
+                    ])
+                )
+                self.grasp_poses.append(grasp)
 
     def to_trajectory_SE3(self) -> TrajectorySE3:
         """Convert poses to SE3 trajectory. The object trajectory is in the Camera Frame."""
@@ -168,18 +207,25 @@ class DataLoader:
         return TrajectorySE3(se3_poses)
 
     @property
-    def best_grasp(self) -> GraspPose:
-        """Get the grasp pose with highest confidence"""
+    def best_grasp(self) -> Optional[GraspPose]:
+        """Get the grasp pose with highest confidence, or None if no grasps loaded"""
+        if not self.grasp_poses:
+            return None
         return max(self.grasp_poses, key=lambda g: g.confidence)
 
     @property
-    def best_grasp_SE3(self) -> pin.SE3:
+    def best_grasp_SE3(self) -> Optional[pin.SE3]:
         """Get the best grasp pose as SE3. The grasp is in the object frame."""
-        return self.best_grasp.to_SE3()
+        best = self.best_grasp
+        return best.to_SE3() if best is not None else None
+
+    @property
+    def has_grasps(self) -> bool:
+        """Check if grasp poses were loaded"""
+        return len(self.grasp_poses) > 0
 
 
 if __name__ == "__main__":
-
     grasp_path = pathlib.Path(
         "/workspaces/object_following_ocp/ressources/filtered_grasps/0d0d1c59b0474d2ea92ce2e172c9f56a_filtered.yml")
     object_traj_path = pathlib.Path(
@@ -187,5 +233,28 @@ if __name__ == "__main__":
     scale_path = pathlib.Path(
         "/workspaces/object_following_ocp/ressources/grasps_scales.json")
 
-    dataloader = DataLoader(object_trajectory_path=object_traj_path,
-                            grasp_poses_SE3_path=grasp_path, scales_path=scale_path)
+    # Old way (still works)
+    print("=== Example 1: Explicit grasp path ===")
+    dataloader = DataLoader(
+        object_trajectory_path=object_traj_path,
+        grasp_poses_SE3_path=grasp_path,
+        scales_path=scale_path
+    )
+    print(f"Loaded {len(dataloader.grasp_poses)} grasps")
+
+    # New way: auto-load grasps
+    print("\n=== Example 2: Auto-load grasps ===")
+    dataloader2 = DataLoader(
+        object_trajectory_path=object_traj_path,
+        scales_path=scale_path,
+        load_grasps=True
+    )
+    print(f"Loaded {len(dataloader2.grasp_poses)} grasps")
+
+    # Without grasps
+    print("\n=== Example 3: No grasps ===")
+    dataloader3 = DataLoader(
+        object_trajectory_path=object_traj_path,
+        scales_path=scale_path
+    )
+    print(f"Has grasps: {dataloader3.has_grasps}")

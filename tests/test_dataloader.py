@@ -433,7 +433,11 @@ class TestDataLoader:
         mesh_dir.mkdir(parents=True, exist_ok=True)
 
         with pytest.raises(ValueError, match="Expected 1 object per file"):
-            DataLoader(traj_path, grasp_path, scales_path)
+            DataLoader(
+                object_trajectory_path=traj_path,
+                scales_path=scales_path,
+                grasp_poses_SE3_path=grasp_path
+            )
 
     def test_scale_fallback(self, tmp_path):
         """Test that object scale is used when not in scales file"""
@@ -472,7 +476,11 @@ class TestDataLoader:
         (mesh_dir / "unknown_mesh_id.obj").touch()
         (mesh_dir / "material_0.png").touch()
 
-        loader = DataLoader(traj_path, grasp_path, scales_path)
+        loader = DataLoader(
+            object_trajectory_path=traj_path,
+            scales_path=scales_path,
+            grasp_poses_SE3_path=grasp_path
+        )
 
         # Should use scale from object file
         assert loader.object_info.scale == pytest.approx(0.123)
@@ -506,6 +514,125 @@ class TestDataLoader:
         assert grasp.position.shape == (3,)
         assert isinstance(grasp.orientation, np.ndarray)
         assert grasp.orientation.shape == (4,)
+
+    def test_no_grasps_by_default(self, temp_files):
+        """Test that grasps are not loaded by default"""
+        loader = DataLoader(
+            object_trajectory_path=temp_files["trajectory"],
+            scales_path=temp_files["scales"]
+            # Note: no grasp path, no load_grasps flag
+        )
+
+        assert not loader.has_grasps
+        assert len(loader.grasp_poses) == 0
+        assert loader.best_grasp is None
+        assert loader.best_grasp_SE3 is None
+
+    def test_auto_load_grasps(self, tmp_path):
+        """Test auto-loading grasps based on mesh_id"""
+        mesh_id = "test_mesh_123"
+
+        # Create trajectory file
+        object_data = {
+            "objects": {
+                "1": {
+                    "mesh": mesh_id,
+                    "score": 0.5,
+                    "scale": 0.1
+                }
+            },
+            "poses": []
+        }
+
+        # Create directory structure
+        json_dir = tmp_path / "json"
+        json_dir.mkdir()
+        traj_path = json_dir / "traj.json"
+
+        with open(traj_path, "w") as f:
+            json.dump(object_data, f)
+
+        # Create scales file
+        scales_path = tmp_path / "scales.json"
+        with open(scales_path, "w") as f:
+            json.dump([], f)
+
+        # Create grasps file in expected location
+        grasps_dir = tmp_path / "filtered_grasps"
+        grasps_dir.mkdir()
+        grasp_path = grasps_dir / f"{mesh_id}_filtered.yml"
+
+        grasp_data = {
+            "grasps": {
+                "grasp_0": {
+                    "confidence": 0.95,
+                    "position": [0.1, 0.2, 0.3],
+                    "orientation": {"w": 1.0, "xyz": [0.0, 0.0, 0.0]}
+                }
+            }
+        }
+
+        with open(grasp_path, "w") as f:
+            yaml.dump(grasp_data, f)
+
+        # Create mesh directory
+        mesh_dir = tmp_path / "meshes" / mesh_id
+        mesh_dir.mkdir(parents=True, exist_ok=True)
+        (mesh_dir / f"{mesh_id}.obj").touch()
+        (mesh_dir / "material_0.png").touch()
+
+        # Test auto-loading
+        loader = DataLoader(
+            object_trajectory_path=traj_path,
+            scales_path=scales_path,
+            load_grasps=True
+        )
+
+        assert loader.has_grasps
+        assert len(loader.grasp_poses) == 1
+        assert loader.best_grasp is not None
+        assert loader.best_grasp.confidence == pytest.approx(0.95)
+
+    def test_auto_load_grasps_not_found(self, tmp_path):
+        """Test that auto-loading fails gracefully when grasp file doesn't exist"""
+        # Create trajectory file
+        object_data = {
+            "objects": {
+                "1": {
+                    "mesh": "nonexistent_mesh",
+                    "score": 0.5,
+                    "scale": 0.1
+                }
+            },
+            "poses": []
+        }
+
+        json_dir = tmp_path / "json"
+        json_dir.mkdir()
+        traj_path = json_dir / "traj.json"
+
+        with open(traj_path, "w") as f:
+            json.dump(object_data, f)
+
+        scales_path = tmp_path / "scales.json"
+        with open(scales_path, "w") as f:
+            json.dump([], f)
+
+        # Create mesh directory
+        mesh_dir = tmp_path / "meshes" / "nonexistent_mesh"
+        mesh_dir.mkdir(parents=True, exist_ok=True)
+        (mesh_dir / "nonexistent_mesh.obj").touch()
+        (mesh_dir / "material_0.png").touch()
+
+        # Should not raise, just not load grasps
+        loader = DataLoader(
+            object_trajectory_path=traj_path,
+            scales_path=scales_path,
+            load_grasps=True
+        )
+
+        assert not loader.has_grasps
+        assert len(loader.grasp_poses) == 0
 
 
 class TestDataLoaderWithRealFiles:
