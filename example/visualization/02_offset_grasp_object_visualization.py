@@ -1,9 +1,15 @@
-"""Visualization of the grasp trajectory in the robot frame (if the transformation of the camera to robot's world is identity)
-"""
 
+""" This visualization is to see the offseted grasp pose in the robot frame (if the transformation of the camera to the robot is identity).
+The offset comes from the fact that GraspGen gives a grasping pose for the TCP tool.
+The transforms are: 
+
+T_finalgrasp_world = T_finalgrasp_graspgen * T_graspgen_object * T_object_camera * T_camera_world
+"""
 import pathlib
 
-from robomeshcat import Object, Robot, Scene
+import numpy as np
+import pinocchio as pin
+from robomeshcat import Object, Scene
 
 from object_following_ocp.data_loader import DataLoader
 from object_following_ocp.robot_loader import load_reduced_panda
@@ -25,16 +31,8 @@ if __name__ == "__main__":
     cdata = cmodel.createData()
     vdata = vmodel.createData()
 
-    robot = Robot(
-        pinocchio_model=rmodel,
-        pinocchio_data=rdata,
-        pinocchio_geometry_model=vmodel,
-        pinocchio_geometry_data=vdata,
-    )
     scene = Scene()
-    scene.add_robot(robot=robot)
     object_info = dataloader.object_info
-    print(object_info)
     # -----------------------------
     # Add object to scene (using paths from parser)
     # -----------------------------
@@ -51,16 +49,17 @@ if __name__ == "__main__":
     best_grasp = dataloader.best_grasp_SE3
     print(best_grasp)
 
-    for k, pose_data in enumerate(object_trajectory_in_camera_frame):
-        color = [0.0, 1.0, 0.0] if k == 0 else [0.5, 0.5, 0.5]
+    offset_transform = pin.SE3.Identity()
+    gripper_depth = 0.1034
+    offset_transform.translation = np.array([0, 0, gripper_depth])
+    scene.add_object(
+        Object.create_sphere(
+            radius=0.01, name="target", color=[0, 0, 1])
+    )
+    pose_data = object_trajectory_in_camera_frame[0]
 
-        scene.add_object(
-            Object.create_sphere(
-                radius=0.01, name=f"target_{k}", color=color)
-        )
+    grasp_pose = pose_data * best_grasp * offset_transform
+    scene["target"].pos[:] = grasp_pose.translation
 
-        grasp_pose = pose_data * best_grasp
-        scene[f"target_{k}"].pos[:] = grasp_pose.translation
-
-        o.pose = pose_data.homogeneous
-        input()
+    o.pose = pose_data.homogeneous
+    input()
