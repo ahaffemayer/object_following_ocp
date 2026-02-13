@@ -17,7 +17,7 @@ class GraspTransformConfig:
 
     # Gripper depth offset (TCP offset from grasp frame)
     # This can be loaded from RobotConfig.gripper_depth
-    gripper_depth: float = 0.1034
+    gripper_depth: float = 0  # 0.1034
 
     # Grasp correction angle (frame convention mismatch)
     grasp_correction_angle_deg: float = 90.0

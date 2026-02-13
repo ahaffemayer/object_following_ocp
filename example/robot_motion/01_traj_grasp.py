@@ -82,7 +82,7 @@ if __name__ == "__main__":
     # Create config from robot config
     grasp_config = GraspTransformConfig.from_robot_config(
         robot_config=robot_config,
-        camera_translation=np.array([0, -1.0, -1.0]),
+        camera_translation=np.array([0, -0.7, -1.0]),
         grasp_correction_angle_deg=90.0,
         elevation_angle_deg=25.0,
     )
