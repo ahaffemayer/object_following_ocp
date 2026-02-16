@@ -1,5 +1,6 @@
 import pathlib
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pinocchio as pin
 from robomeshcat import Object, Robot, Scene
@@ -222,6 +223,7 @@ if __name__ == "__main__":
     print("Type 'q' to quit")
     print("=" * 60)
 
+    poses_tool = []
     valid_idx = 0
     for k in range(len(ee_traj_world)):
         if joint_configurations[k] is not None:
@@ -234,8 +236,297 @@ if __name__ == "__main__":
                 break
 
             robot[:] = joint_trajectory[valid_idx]
+            pin.framesForwardKinematics(
+                rmodel, rdata, np.array((joint_trajectory[valid_idx]))
+            )
+            tool_pose = rdata.oMf[rmodel.getFrameId("panda_hand_tcp")]
+            poses_tool.append(tool_pose.copy())
             o.pose = object_traj_world[k].homogeneous
             print(f"Displaying trajectory point {k}")
             valid_idx += 1
         else:
             print(f"Skipping point {k} (IK failed)")
+
+    # -----------------------------
+    # Plot trajectory comparison with frame analysis
+    # -----------------------------
+    # Extract translations from trajectories
+    ee_translations = np.array([pose.translation for pose in ee_traj_world])
+    tool_translations = np.array([pose.translation for pose in poses_tool])
+
+    # Extract rotations and compute orientation errors
+    ee_rotations = [pose.rotation for pose in ee_traj_world[: len(poses_tool)]]
+    tool_rotations = [pose.rotation for pose in poses_tool]
+
+    # Compute position errors in world frame
+    position_errors_world = (
+        tool_translations - ee_translations[: len(tool_translations)]
+    )
+    position_error_norms = np.linalg.norm(position_errors_world, axis=1)
+
+    # Compute orientation errors (rotation angle between frames)
+    orientation_errors = []
+    position_errors_gripper = []  # Errors in gripper frame
+
+    for i in range(len(tool_rotations)):
+        # Relative rotation: R_error = R_tool^T @ R_target
+        R_diff = tool_rotations[i].T @ ee_rotations[i]
+
+        # Compute angle from rotation matrix
+        trace = np.trace(R_diff)
+        angle = np.arccos(np.clip((trace - 1) / 2, -1, 1))
+        orientation_errors.append(angle.copy())
+
+        # Transform position error to target gripper frame
+        # This shows the error along approach/lateral/binormal directions
+        pos_error_gripper = ee_rotations[i].T @ position_errors_world[i]
+        position_errors_gripper.append(pos_error_gripper.copy())
+
+    orientation_errors = np.array(orientation_errors)
+    position_errors_gripper = np.array(position_errors_gripper)
+
+    # Create time indices
+    ee_indices = np.arange(len(ee_traj_world))
+    tool_indices = np.arange(len(poses_tool))
+
+    # Create figure with 6 subplots (2 columns)
+    fig = plt.figure(figsize=(16, 12))
+    gs = fig.add_gridspec(3, 2, hspace=0.3, wspace=0.25)
+
+    fig.suptitle(
+        "Trajectory Comparison: Frame Alignment Analysis",
+        fontsize=16,
+        fontweight="bold",
+    )
+
+    # Left column: World frame positions
+    ax0 = fig.add_subplot(gs[0, 0])
+    ax0.plot(ee_indices, ee_translations[:, 0], "b-", label="EE Target", linewidth=2)
+    ax0.plot(
+        tool_indices, tool_translations[:, 0], "r--", label="Tool Actual", linewidth=2
+    )
+    ax0.set_ylabel("X Position [m]", fontweight="bold")
+    ax0.legend(loc="best")
+    ax0.grid(True, alpha=0.3)
+    ax0.set_title("World Frame Positions", fontweight="bold")
+
+    ax1 = fig.add_subplot(gs[1, 0])
+    ax1.plot(ee_indices, ee_translations[:, 1], "b-", label="EE Target", linewidth=2)
+    ax1.plot(
+        tool_indices, tool_translations[:, 1], "r--", label="Tool Actual", linewidth=2
+    )
+    ax1.set_ylabel("Y Position [m]", fontweight="bold")
+    ax1.legend(loc="best")
+    ax1.grid(True, alpha=0.3)
+
+    ax2 = fig.add_subplot(gs[2, 0])
+    ax2.plot(ee_indices, ee_translations[:, 2], "b-", label="EE Target", linewidth=2)
+    ax2.plot(
+        tool_indices, tool_translations[:, 2], "r--", label="Tool Actual", linewidth=2
+    )
+    ax2.set_ylabel("Z Position [m]", fontweight="bold")
+    ax2.set_xlabel("Trajectory Point Index", fontweight="bold")
+    ax2.legend(loc="best")
+    ax2.grid(True, alpha=0.3)
+
+    # Right column: Error analysis
+    ax3 = fig.add_subplot(gs[0, 1])
+    ax3.plot(
+        tool_indices,
+        position_errors_world[:, 0],
+        "r-",
+        label="X Error",
+        linewidth=1.5,
+        alpha=0.7,
+    )
+    ax3.plot(
+        tool_indices,
+        position_errors_world[:, 1],
+        "g-",
+        label="Y Error",
+        linewidth=1.5,
+        alpha=0.7,
+    )
+    ax3.plot(
+        tool_indices,
+        position_errors_world[:, 2],
+        "b-",
+        label="Z Error",
+        linewidth=1.5,
+        alpha=0.7,
+    )
+    ax3.plot(tool_indices, position_error_norms, "k-", label="Total Error", linewidth=2)
+    ax3.axhline(y=0, color="gray", linestyle="--", linewidth=1, alpha=0.5)
+    ax3.set_ylabel("Position Error [m]", fontweight="bold")
+    ax3.legend(loc="best", fontsize=8)
+    ax3.grid(True, alpha=0.3)
+    ax3.set_title("Position Errors (World Frame)", fontweight="bold")
+
+    ax4 = fig.add_subplot(gs[1, 1])
+    ax4.plot(
+        tool_indices,
+        position_errors_gripper[:, 0],
+        "r-",
+        label="Lateral (X)",
+        linewidth=2,
+    )
+    ax4.plot(
+        tool_indices,
+        position_errors_gripper[:, 1],
+        "g-",
+        label="Binormal (Y)",
+        linewidth=2,
+    )
+    ax4.plot(
+        tool_indices,
+        position_errors_gripper[:, 2],
+        "b-",
+        label="Approach (Z)",
+        linewidth=2,
+    )
+    ax4.axhline(y=0, color="gray", linestyle="--", linewidth=1, alpha=0.5)
+    ax4.axhline(
+        y=0.1034,
+        color="blue",
+        linestyle=":",
+        linewidth=2,
+        alpha=0.7,
+        label="Expected depth (0.1034m)",
+    )
+    ax4.axhline(y=-0.1034, color="blue", linestyle=":", linewidth=2, alpha=0.7)
+    ax4.set_ylabel("Position Error [m]", fontweight="bold")
+    ax4.legend(loc="best", fontsize=8)
+    ax4.grid(True, alpha=0.3)
+    ax4.set_title(
+        "Position Errors (Gripper Frame) - Key Plot!",
+        fontweight="bold",
+        color="darkred",
+    )
+
+    # Add statistics for gripper frame errors
+    stats_text_gripper = (
+        f"Approach (Z): {np.mean(position_errors_gripper[:, 2]):.4f} m (mean)\n"
+        f"Lateral (X): {np.mean(np.abs(position_errors_gripper[:, 0])):.4f} m (|mean|)\n"
+        f"Binormal (Y): {np.mean(np.abs(position_errors_gripper[:, 1])):.4f} m (|mean|)\n"
+        f"Std Approach: {np.std(position_errors_gripper[:, 2]):.4f} m"
+    )
+    ax4.text(
+        0.02,
+        0.98,
+        stats_text_gripper,
+        transform=ax4.transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="lightblue", alpha=0.8),
+    )
+
+    ax5 = fig.add_subplot(gs[2, 1])
+    ax5.plot(
+        tool_indices,
+        np.rad2deg(orientation_errors),
+        "purple",
+        linewidth=2,
+        label="Orientation Error",
+    )
+    ax5.axhline(y=0, color="gray", linestyle="--", linewidth=1, alpha=0.5)
+    ax5.set_ylabel("Rotation Error [deg]", fontweight="bold")
+    ax5.set_xlabel("Trajectory Point Index", fontweight="bold")
+    ax5.legend(loc="best")
+    ax5.grid(True, alpha=0.3)
+    ax5.set_title("Orientation Errors", fontweight="bold")
+
+    # Add orientation statistics
+    stats_text_ori = (
+        f"Mean: {np.rad2deg(np.mean(orientation_errors)):.3f}°\n"
+        f"Max: {np.rad2deg(np.max(orientation_errors)):.3f}°\n"
+        f"Std: {np.rad2deg(np.std(orientation_errors)):.3f}°"
+    )
+    ax5.text(
+        0.02,
+        0.98,
+        stats_text_ori,
+        transform=ax5.transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="plum", alpha=0.8),
+    )
+
+    # Save plot to file since we're in a dev container
+    output_path = pathlib.Path(
+        "/workspaces/object_following_ocp/trajectory_comparison.png"
+    )
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    print(f"\nPlot saved to: {output_path}")
+
+    # Print comprehensive statistics
+    print("\n" + "=" * 70)
+    print("FRAME ALIGNMENT ANALYSIS")
+    print("=" * 70)
+
+    print("\n1. WORLD FRAME POSITION ERRORS:")
+    print(f"   Mean total error: {np.mean(position_error_norms):.4f} m")
+    print(f"   Max total error: {np.max(position_error_norms):.4f} m")
+    print(f"   RMS error: {np.sqrt(np.mean(position_error_norms**2)):.4f} m")
+    print(
+        f"   Mean X error: {np.mean(position_errors_world[:, 0]):.4f} m (abs: {np.mean(np.abs(position_errors_world[:, 0])):.4f} m)"
+    )
+    print(
+        f"   Mean Y error: {np.mean(position_errors_world[:, 1]):.4f} m (abs: {np.mean(np.abs(position_errors_world[:, 1])):.4f} m)"
+    )
+    print(
+        f"   Mean Z error: {np.mean(position_errors_world[:, 2]):.4f} m (abs: {np.mean(np.abs(position_errors_world[:, 2])):.4f} m)"
+    )
+
+    print("\n2. GRIPPER FRAME POSITION ERRORS (This is the key!):")
+    print(
+        f"   Approach (Z) - mean: {np.mean(position_errors_gripper[:, 2]):.4f} m, std: {np.std(position_errors_gripper[:, 2]):.4f} m"
+    )
+    print(
+        f"   Lateral (X)  - mean: {np.mean(position_errors_gripper[:, 0]):.4f} m, std: {np.std(position_errors_gripper[:, 0]):.4f} m"
+    )
+    print(
+        f"   Binormal (Y) - mean: {np.mean(position_errors_gripper[:, 1]):.4f} m, std: {np.std(position_errors_gripper[:, 1]):.4f} m"
+    )
+    print("   Expected gripper depth: 0.1034 m")
+
+    is_approach_aligned = np.abs(np.mean(position_errors_gripper[:, 2]) - 0.1034) < 0.01
+    is_lateral_aligned = np.mean(np.abs(position_errors_gripper[:, 0])) < 0.005
+    is_binormal_aligned = np.mean(np.abs(position_errors_gripper[:, 1])) < 0.005
+
+    print("\n3. ORIENTATION ERRORS:")
+    print(
+        f"   Mean rotation error: {np.rad2deg(np.mean(orientation_errors)):.3f} degrees"
+    )
+    print(
+        f"   Max rotation error: {np.rad2deg(np.max(orientation_errors)):.3f} degrees"
+    )
+    print(
+        f"   Std rotation error: {np.rad2deg(np.std(orientation_errors)):.3f} degrees"
+    )
+
+    print("\n4. DIAGNOSIS:")
+    if is_approach_aligned and is_lateral_aligned and is_binormal_aligned:
+        print("   ✓ Frames appear CORRECTLY ALIGNED!")
+        print("   ✓ Gripper depth offset is along approach axis as expected")
+    elif is_approach_aligned:
+        print("   ⚠ Approach axis offset matches gripper depth (0.1034m)")
+        print("   ⚠ But lateral/binormal errors exist - possible frame twist or offset")
+    else:
+        print("   ✗ FRAME MISALIGNMENT DETECTED!")
+        print(
+            f"   ✗ Approach error ({np.mean(position_errors_gripper[:, 2]):.4f}m) != expected depth (0.1034m)"
+        )
+        print("   → Check frame definitions between GraspNet and Pinocchio")
+        print(
+            "   → Verify grasp transform chain (camera→world, object→grasp, grasp→EE)"
+        )
+
+    if np.rad2deg(np.mean(orientation_errors)) > 1.0:
+        print(
+            f"   ⚠ Significant orientation error ({np.rad2deg(np.mean(orientation_errors)):.2f}°)"
+        )
+        print("   → This will cause the approach axis to point in wrong direction")
+
+    print("=" * 70)
+
+    plt.close()
