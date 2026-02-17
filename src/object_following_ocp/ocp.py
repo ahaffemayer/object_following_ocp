@@ -1,12 +1,13 @@
-import pinocchio as pin
-import crocoddyl
-import colmpc as col
 import sys
-from typing import Any
-import numpy as np
-import mim_solvers
 
-from object_following_ocp.trajectory import Trajectory
+import colmpc as col
+import crocoddyl
+import mim_solvers
+import numpy as np
+import pinocchio as pin
+
+from object_following_ocp.trajectories import TrajectorySE3
+
 
 class OCP:
     """Optimal control problem for a Panda robot reaching a target, with collision avoidance"""
@@ -15,7 +16,7 @@ class OCP:
         self,
         rmodel: pin.Model,
         cmodel: pin.GeometryModel,
-        target_poses: pin.SE3 | Trajectory | list[pin.SE3],
+        target_poses: pin.SE3 | TrajectorySE3 | list[pin.SE3],
         x0: np.ndarray,
         joint_limits: bool = False,
         joint_limits_constraint: bool = False,
@@ -69,17 +70,15 @@ class OCP:
                     f"Expected at least {self._T} target poses, got {len(target_poses)}"
                 )
             return list(target_poses)
-        
-        if isinstance(target_poses, Trajectory):
+
+        if isinstance(target_poses, TrajectorySE3):
             if len(target_poses) < self._T:
                 raise ValueError(
                     f"Expected at least {self._T} target poses, got {len(target_poses)}"
                 )
             return list(target_poses.poses)
-        
-        raise TypeError(
-            "target_poses must be pin.SE3 or list[pin.SE3]"
-        )
+
+        raise TypeError("target_poses must be pin.SE3 or list[pin.SE3]")
 
     def create_OCP(self):
 
@@ -97,7 +96,6 @@ class OCP:
         running_models = []
 
         for t in range(self._T - 1):
-
             # ---------- COSTS ----------
             runningCostModel = crocoddyl.CostModelSum(self._state)
 
@@ -117,9 +115,7 @@ class OCP:
             # )
             goalCost = crocoddyl.CostModelResidual(self._state, frameResidual)
 
-            runningCostModel.addCost(
-                "gripperPose", goalCost, self._WEIGHT_GRIPPER_POSE
-            )
+            runningCostModel.addCost("gripperPose", goalCost, self._WEIGHT_GRIPPER_POSE)
 
             # ---------- CONSTRAINTS ----------
             runningConstraintManager = crocoddyl.ConstraintModelManager(
@@ -148,14 +144,18 @@ class OCP:
             # Joint limits
             if self._joints_limits:
                 maxfloat = sys.float_info.max
-                xlb = np.concatenate([
-                    self._rmodel.lowerPositionLimit,
-                    -maxfloat * np.ones(self._state.nv),
-                ])
-                xub = np.concatenate([
-                    self._rmodel.upperPositionLimit,
-                    maxfloat * np.ones(self._state.nv),
-                ])
+                xlb = np.concatenate(
+                    [
+                        self._rmodel.lowerPositionLimit,
+                        -maxfloat * np.ones(self._state.nv),
+                    ]
+                )
+                xub = np.concatenate(
+                    [
+                        self._rmodel.upperPositionLimit,
+                        maxfloat * np.ones(self._state.nv),
+                    ]
+                )
 
                 xLimitResidual = crocoddyl.ResidualModelState(
                     self._state, self._x0, self._actuation.nu
@@ -168,19 +168,14 @@ class OCP:
                         xlb,
                         xub,
                     )
-                    runningConstraintManager.addConstraint(
-                        f"lim_{t}", limitConstraint
-                    )
+                    runningConstraintManager.addConstraint(f"lim_{t}", limitConstraint)
                 else:
                     bounds = crocoddyl.ActivationBounds(xlb, xub, 1.0)
                     activation = crocoddyl.ActivationModelQuadraticBarrier(bounds)
                     limitCost = crocoddyl.CostModelResidual(
                         self._state, activation, xLimitResidual
                     )
-                    runningCostModel.addCost(
-                        "limitCost", limitCost, self._WEIGHT_LIMIT
-                    )
-
+                    runningCostModel.addCost("limitCost", limitCost, self._WEIGHT_LIMIT)
 
             # ---------- DYNAMICS ----------
             dam = crocoddyl.DifferentialActionModelFreeFwdDynamics(
@@ -191,9 +186,7 @@ class OCP:
             )
 
             iam = crocoddyl.IntegratedActionModelEuler(dam, self._dt)
-            iam.differential.armature = np.array(
-                [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0]
-            )
+            iam.differential.armature = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0])
 
             running_models.append(iam)
 
@@ -213,9 +206,7 @@ class OCP:
         #     self._endeff_frame,
         #     terminalTarget.translation,
         # )
-        terminalGoalCost = crocoddyl.CostModelResidual(
-            self._state, terminalResidual
-        )
+        terminalGoalCost = crocoddyl.CostModelResidual(self._state, terminalResidual)
 
         terminalCostModel.addCost(
             "gripperPose", terminalGoalCost, self._WEIGHT_GRIPPER_POSE_TERM
@@ -232,17 +223,13 @@ class OCP:
             terminalConstraintManager,
         )
 
-        terminalModel = crocoddyl.IntegratedActionModelEuler(
-            terminalDAM, 0.0
-        )
+        terminalModel = crocoddyl.IntegratedActionModelEuler(terminalDAM, 0.0)
         terminalModel.differential.armature = np.array(
             [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0]
         )
 
         # ---------- PROBLEM + SOLVER ----------
-        problem = crocoddyl.ShootingProblem(
-            self._x0, running_models, terminalModel
-        )
+        problem = crocoddyl.ShootingProblem(self._x0, running_models, terminalModel)
 
         ocp = mim_solvers.SolverCSQP(problem)
 
