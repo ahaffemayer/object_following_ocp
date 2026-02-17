@@ -15,10 +15,10 @@ Workflow:
 
 import pathlib
 
-from camera_grid_search import CameraPositionGridSearch
+from example.robot_motion.utils.camera_grid_search import CameraPositionGridSearch
 from robomeshcat import Object, Robot, Scene
-from trajectory_reviewer import TrajectoryReviewer
-from trajectory_visualizer import TrajectoryVisualizer
+from example.robot_motion.utils.trajectory_reviewer import TrajectoryReviewer
+from example.robot_motion.utils.trajectory_visualizer import TrajectoryVisualizer
 
 from object_following_ocp.data_loader import ConfigLoader, DataLoader
 from object_following_ocp.robot_loader import load_reduced_panda

@@ -9,10 +9,10 @@ from typing import List, Optional
 
 import numpy as np
 import pinocchio as pin
-from camera_grid_search import TrajectoryCandidate
-from ocp_trajectory_converter import OCPTrajectoryConverter
-from trajectory_visualizer import TrajectoryVisualizer
 
+from example.robot_motion.utils.camera_grid_search import TrajectoryCandidate
+from example.robot_motion.utils.ocp_trajectory_converter import OCPTrajectoryConverter
+from example.robot_motion.utils.trajectory_visualizer import TrajectoryVisualizer
 from object_following_ocp.data_loader import DataLoader, RobotConfig
 from object_following_ocp.ocp import OCP
 

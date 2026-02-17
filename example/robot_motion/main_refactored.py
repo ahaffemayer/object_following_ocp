@@ -5,13 +5,13 @@ Refactored object following with OCP - using modular wrappers.
 import pathlib
 
 import numpy as np
-from ik_trajectory_converter import IKTrajectoryConverter
-from ocp_trajectory_converter import OCPTrajectoryConverter
+from example.robot_motion.utils.ik_trajectory_converter import IKTrajectoryConverter
+from example.robot_motion.utils.ocp_trajectory_converter import OCPTrajectoryConverter
 from robomeshcat import Object, Robot, Scene
 
 # Import our new wrappers
-from trajectory_ik_solver import TrajectoryIKSolver
-from trajectory_visualizer import TrajectoryVisualizer
+from example.robot_motion.utils.trajectory_ik_solver import TrajectoryIKSolver
+from example.robot_motion.utils.trajectory_visualizer import TrajectoryVisualizer
 
 from object_following_ocp.data_loader import ConfigLoader, DataLoader
 from object_following_ocp.ocp import OCP

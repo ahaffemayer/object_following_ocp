@@ -271,7 +271,9 @@ class TrajectoryVisualizer:
             show_waypoints: Whether to show target spheres during animation
         """
         # Import here to avoid circular imports
-        from ocp_trajectory_converter import OCPTrajectoryConverter
+        from example.robot_motion.utils.ocp_trajectory_converter import (
+            OCPTrajectoryConverter,
+        )
 
         num = loader.num_trajectories
         meta = loader.get_metadata()

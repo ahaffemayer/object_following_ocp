@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import numpy as np
-from ik_trajectory_converter import IKTrajectoryConverter
-from trajectory_ik_solver import TrajectoryIKSolver
 
+from example.robot_motion.utils.ik_trajectory_converter import IKTrajectoryConverter
+from example.robot_motion.utils.trajectory_ik_solver import TrajectoryIKSolver
 from object_following_ocp.data_loader import DataLoader, RobotConfig
 from object_following_ocp.trajectories import (
     TrajectoryInConfigurationSpace,
