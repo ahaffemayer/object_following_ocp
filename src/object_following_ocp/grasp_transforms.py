@@ -250,6 +250,30 @@ class GraspTransformChain:
         self.config.camera_translation = translation
         self.wM_camera.translation = translation
 
+    def compute_object_pose_from_tcp(
+        self,
+        tcp_pose: Union[pin.SE3, TrajectorySE3],
+        objectM_grasp: pin.SE3,
+    ) -> Union[pin.SE3, TrajectorySE3]:
+        """
+        Recover object pose(s) in world frame from TCP pose(s).
+
+        Inverts the chain:
+        wM_tcp = wM_object * objectM_grasp * graspM_grasp_corrected * grasp_correctedM_tcp
+
+        So: wM_object = wM_tcp * grasp_correctedM_tcp^{-1} * graspM_grasp_corrected^{-1} * objectM_grasp^{-1}
+        """
+        suffix_inv = (
+            self.grasp_correctedM_tcp.inverse()
+            * self.graspM_grasp_corrected.inverse()
+            * objectM_grasp.inverse()
+        )
+
+        if isinstance(tcp_pose, TrajectorySE3):
+            return tcp_pose * suffix_inv
+        else:
+            return tcp_pose * suffix_inv
+
     def get_transform_summary(self) -> str:
         """Get a human-readable summary of all transformations."""
         summary = []
