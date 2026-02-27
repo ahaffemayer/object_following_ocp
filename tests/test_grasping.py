@@ -2,12 +2,12 @@ import numpy as np
 import pinocchio as pin
 import pytest
 
-from object_following_ocp.data_loader import RobotConfig
-from object_following_ocp.grasp_transforms import (
+from object_following_ocp.data.data_loader import RobotConfig
+from object_following_ocp.geom.grasp_transforms import (
     GraspTransformChain,
     GraspTransformConfig,
 )
-from object_following_ocp.trajectories import TrajectorySE3
+from object_following_ocp.geom.trajectories import TrajectorySE3
 
 
 class TestGraspTransformConfig:

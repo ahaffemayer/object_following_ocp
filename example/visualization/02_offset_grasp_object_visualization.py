@@ -11,8 +11,8 @@ import numpy as np
 import pinocchio as pin
 from robomeshcat import Object, Scene
 
-from object_following_ocp.data_loader import DataLoader
-from object_following_ocp.robot_loader import load_reduced_panda
+from object_following_ocp.data.data_loader import DataLoader
+from object_following_ocp.robot.robot_loader import load_reduced_panda
 
 if __name__ == "__main__":
     object_traj_path = pathlib.Path(

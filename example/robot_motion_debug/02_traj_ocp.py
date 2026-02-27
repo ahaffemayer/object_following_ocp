@@ -4,15 +4,15 @@ import numpy as np
 import pinocchio as pin
 from robomeshcat import Object, Robot, Scene
 
-from object_following_ocp.data_loader import ConfigLoader, DataLoader
-from object_following_ocp.grasp_transforms import (
+from object_following_ocp.data.data_loader import ConfigLoader, DataLoader
+from object_following_ocp.geom.grasp_transforms import (
     GraspTransformChain,
     GraspTransformConfig,
 )
-from object_following_ocp.ik_curobo import RobotIKSolver
-from object_following_ocp.ocp import OCP
-from object_following_ocp.robot_loader import load_reduced_panda
-from object_following_ocp.trajectories import TrajectoryInConfigurationSpace
+from object_following_ocp.solver.ik_curobo import RobotIKSolver
+from object_following_ocp.solver.ocp import OCP
+from object_following_ocp.robot.robot_loader import load_reduced_panda
+from object_following_ocp.geom.trajectories import TrajectoryInConfigurationSpace
 
 if __name__ == "__main__":
     # -----------------------------

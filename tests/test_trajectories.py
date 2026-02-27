@@ -1,6 +1,7 @@
 """
 Tests for trajectory iteration functionality
 """
+
 import numpy as np
 import pinocchio as pin
 import pytest
@@ -8,7 +9,7 @@ import pytest
 
 def test_trajectory_se3_iteration():
     """Test that TrajectorySE3 is properly iterable"""
-    from object_following_ocp.trajectories import TrajectorySE3
+    from object_following_ocp.geom.trajectories import TrajectorySE3
 
     # Create test poses
     poses = [
@@ -26,16 +27,19 @@ def test_trajectory_se3_iteration():
 
     assert len(collected_poses) == 3
     np.testing.assert_array_almost_equal(
-        collected_poses[0].translation, [1.0, 0.0, 0.0])
+        collected_poses[0].translation, [1.0, 0.0, 0.0]
+    )
     np.testing.assert_array_almost_equal(
-        collected_poses[1].translation, [2.0, 0.0, 0.0])
+        collected_poses[1].translation, [2.0, 0.0, 0.0]
+    )
     np.testing.assert_array_almost_equal(
-        collected_poses[2].translation, [3.0, 0.0, 0.0])
+        collected_poses[2].translation, [3.0, 0.0, 0.0]
+    )
 
 
 def test_trajectory_se3_enumerate():
     """Test that TrajectorySE3 works with enumerate()"""
-    from object_following_ocp.trajectories import TrajectorySE3
+    from object_following_ocp.geom.trajectories import TrajectorySE3
 
     poses = [
         pin.SE3(np.eye(3), np.array([1.0, 0.0, 0.0])),
@@ -47,13 +51,12 @@ def test_trajectory_se3_enumerate():
     # Test enumerate
     for i, pose in enumerate(trajectory):
         expected = float(i + 1)
-        np.testing.assert_array_almost_equal(
-            pose.translation, [expected, 0.0, 0.0])
+        np.testing.assert_array_almost_equal(pose.translation, [expected, 0.0, 0.0])
 
 
 def test_trajectory_se3_list_conversion():
     """Test that TrajectorySE3 can be converted to list"""
-    from object_following_ocp.trajectories import TrajectorySE3
+    from object_following_ocp.geom.trajectories import TrajectorySE3
 
     poses = [
         pin.SE3(np.eye(3), np.array([1.0, 0.0, 0.0])),
@@ -70,7 +73,7 @@ def test_trajectory_se3_list_conversion():
 
 def test_trajectory_config_space_iteration():
     """Test that TrajectoryInConfigurationSpace is properly iterable"""
-    from object_following_ocp.trajectories import TrajectoryInConfigurationSpace
+    from object_following_ocp.geom.trajectories import TrajectoryInConfigurationSpace
 
     configs = [
         np.array([0.0, 0.0, 0.0]),
@@ -93,7 +96,7 @@ def test_trajectory_config_space_iteration():
 
 def test_trajectory_config_space_enumerate():
     """Test that TrajectoryInConfigurationSpace works with enumerate()"""
-    from object_following_ocp.trajectories import TrajectoryInConfigurationSpace
+    from object_following_ocp.geom.trajectories import TrajectoryInConfigurationSpace
 
     configs = [
         np.array([0.0, 0.0, 0.0]),

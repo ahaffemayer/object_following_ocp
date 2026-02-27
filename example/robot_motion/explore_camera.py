@@ -14,12 +14,12 @@ import sys
 import numpy as np
 from robomeshcat import Object, Robot, Scene
 
-from object_following_ocp.data_loader import ConfigLoader, DataLoader
-from object_following_ocp.grasp_transforms import (
+from object_following_ocp.data.data_loader import ConfigLoader, DataLoader
+from object_following_ocp.geom.grasp_transforms import (
     GraspTransformChain,
     GraspTransformConfig,
 )
-from object_following_ocp.robot_loader import load_reduced_panda
+from object_following_ocp.robot.robot_loader import load_reduced_panda
 
 RESOURCES_DIR = pathlib.Path("/workspaces/object_following_ocp/ressources")
 CONFIG_PATH = pathlib.Path(

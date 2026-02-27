@@ -5,7 +5,7 @@ import crocoddyl
 import numpy as np
 import pinocchio as pin
 
-from object_following_ocp.trajectories import TrajectorySE3
+from object_following_ocp.geom.trajectories import TrajectorySE3
 
 
 class OCP:

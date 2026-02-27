@@ -12,13 +12,13 @@ import pinocchio as pin
 import pytest
 import yaml
 
-from object_following_ocp.data_loader import (
+from object_following_ocp.data.data_loader import (
     DataLoader,
     GraspPose,
     ObjectInfo,
     PoseData,
 )
-from object_following_ocp.trajectories import TrajectorySE3
+from object_following_ocp.geom.trajectories import TrajectorySE3
 
 
 class TestPoseData:
@@ -773,7 +773,7 @@ class TestRobotConfig:
 
     def test_robot_config_creation(self):
         """Test creating a RobotConfig object"""
-        from object_following_ocp.data_loader import RobotConfig
+        from object_following_ocp.data.data_loader import RobotConfig
 
         config = RobotConfig(
             W_xREG=0.001,
@@ -799,7 +799,7 @@ class TestRobotConfig:
 
     def test_robot_config_attributes(self):
         """Test that RobotConfig has all expected attributes"""
-        from object_following_ocp.data_loader import RobotConfig
+        from object_following_ocp.data.data_loader import RobotConfig
 
         config = RobotConfig(
             W_xREG=1.0,
@@ -853,7 +853,7 @@ class TestConfigLoader:
 
     def test_config_loader_load(self, temp_config_file):
         """Test ConfigLoader.load() method"""
-        from object_following_ocp.data_loader import ConfigLoader
+        from object_following_ocp.data.data_loader import ConfigLoader
 
         config = ConfigLoader.load(str(temp_config_file))
 
@@ -869,7 +869,7 @@ class TestConfigLoader:
 
     def test_config_loader_returns_robot_config(self, temp_config_file):
         """Test that ConfigLoader returns a RobotConfig instance"""
-        from object_following_ocp.data_loader import ConfigLoader, RobotConfig
+        from object_following_ocp.data.data_loader import ConfigLoader, RobotConfig
 
         config = ConfigLoader.load(str(temp_config_file))
 
@@ -877,7 +877,7 @@ class TestConfigLoader:
 
     def test_config_loader_with_different_values(self, tmp_path):
         """Test ConfigLoader with different config values"""
-        from object_following_ocp.data_loader import ConfigLoader
+        from object_following_ocp.data.data_loader import ConfigLoader
 
         config_data = {
             "weights": {
@@ -910,14 +910,14 @@ class TestConfigLoader:
 
     def test_config_loader_missing_file(self):
         """Test ConfigLoader with non-existent file"""
-        from object_following_ocp.data_loader import ConfigLoader
+        from object_following_ocp.data.data_loader import ConfigLoader
 
         with pytest.raises(FileNotFoundError):
             ConfigLoader.load("/nonexistent/path/config.yml")
 
     def test_config_loader_invalid_yaml(self, tmp_path):
         """Test ConfigLoader with invalid YAML"""
-        from object_following_ocp.data_loader import ConfigLoader
+        from object_following_ocp.data.data_loader import ConfigLoader
 
         config_path = tmp_path / "invalid.yml"
         with open(config_path, "w") as f:
@@ -928,7 +928,7 @@ class TestConfigLoader:
 
     def test_config_loader_missing_weights_section(self, tmp_path):
         """Test ConfigLoader with missing weights section"""
-        from object_following_ocp.data_loader import ConfigLoader
+        from object_following_ocp.data.data_loader import ConfigLoader
 
         config_data = {"safety_threshold": 0.02, "dt": 0.01, "gripper_depth": 0.1034}
 
@@ -945,7 +945,7 @@ class TestConfigLoader:
     )
     def test_config_loader_real_file(self):
         """Test ConfigLoader with the real config file"""
-        from object_following_ocp.data_loader import ConfigLoader
+        from object_following_ocp.data.data_loader import ConfigLoader
 
         config_path = pathlib.Path(
             "/workspaces/object_following_ocp/example/robot_motion/configs/ik_config.yml"

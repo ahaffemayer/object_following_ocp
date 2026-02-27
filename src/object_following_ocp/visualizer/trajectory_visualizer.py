@@ -9,7 +9,7 @@ import numpy as np
 import pinocchio as pin
 from robomeshcat import Object, Robot, Scene
 
-from object_following_ocp.trajectories import (
+from object_following_ocp.geom.trajectories import (
     TrajectoryInConfigurationSpace,
     TrajectorySE3,
 )

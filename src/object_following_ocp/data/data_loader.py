@@ -7,12 +7,13 @@ import numpy as np
 import pinocchio as pin
 import yaml
 
-from object_following_ocp.trajectories import TrajectorySE3
+from object_following_ocp.geom.trajectories import TrajectorySE3
 
 
 @dataclass
 class ObjectInfo:
     """Object information from JSON"""
+
     mesh_id: str
     score: float
     scale: float
@@ -23,6 +24,7 @@ class ObjectInfo:
 @dataclass
 class PoseData:
     """Single pose from trajectory"""
+
     im_id: int
     object_id: int
     score: float
@@ -39,6 +41,7 @@ class PoseData:
 @dataclass
 class GraspPose:
     """Grasp pose with position and orientation"""
+
     name: str
     confidence: float
     position: np.ndarray  # 3x1 position vector
@@ -47,18 +50,21 @@ class GraspPose:
     def to_SE3(self) -> pin.SE3:
         """Convert to Pinocchio SE3 object"""
         # Quaternion is [w, x, y, z], Pinocchio expects [x, y, z, w]
-        quat_pinocchio = np.array([
-            self.orientation[1],  # x
-            self.orientation[2],  # y
-            self.orientation[3],  # z
-            self.orientation[0]   # w
-        ])
+        quat_pinocchio = np.array(
+            [
+                self.orientation[1],  # x
+                self.orientation[2],  # y
+                self.orientation[3],  # z
+                self.orientation[0],  # w
+            ]
+        )
         return pin.SE3(pin.Quaternion(quat_pinocchio).matrix(), self.position)
 
 
 @dataclass
 class RobotConfig:
     """Robot-specific configuration from YAML"""
+
     W_xREG: float
     W_uREG: float
     W_gripper_pose: float
@@ -73,6 +79,7 @@ class RobotConfig:
 @dataclass
 class DataLoader:
     """Loader for a single object trajectory with its grasp poses and scale"""
+
     object_info: ObjectInfo
     object_id: int
     poses: list[PoseData]
@@ -107,7 +114,7 @@ class DataLoader:
             loader = DataLoader(traj_path, scales_path, load_grasps=True)
 
             # With custom grasps directory
-            loader = DataLoader(traj_path, scales_path, load_grasps=True, 
+            loader = DataLoader(traj_path, scales_path, load_grasps=True,
                               grasps_directory=Path("custom/grasps/dir"))
         """
         # --- Load scales first (contains ALL objects) ---
@@ -119,7 +126,7 @@ class DataLoader:
             mesh_name = scale_entry["Name"].strip()
             scales[mesh_name] = {
                 "scale": scale_entry["scale"],
-                "scale_from_dataset": scale_entry["scale_from_dataset"]
+                "scale_from_dataset": scale_entry["scale_from_dataset"],
             }
 
         # --- Load object trajectory ---
@@ -129,7 +136,8 @@ class DataLoader:
         # Parse object info (should be only one per file)
         if len(object_data["objects"]) != 1:
             raise ValueError(
-                f"Expected 1 object per file, got {len(object_data['objects'])}")
+                f"Expected 1 object per file, got {len(object_data['objects'])}"
+            )
 
         obj_id_str, obj_info_dict = next(iter(object_data["objects"].items()))
         self.object_id = int(obj_id_str)
@@ -142,8 +150,12 @@ class DataLoader:
             scale = obj_info_dict["scale"]
 
         # Mesh path (stored in the parent folder of the trajs, in the directory meshes/id/id.obj)
-        mesh_path = object_trajectory_path.parent.parent / \
-            "meshes" / f"{mesh_id}" / f"{mesh_id}.obj"
+        mesh_path = (
+            object_trajectory_path.parent.parent
+            / "meshes"
+            / f"{mesh_id}"
+            / f"{mesh_id}.obj"
+        )
         # Texture path (same folder but different name)
         texture_path = mesh_path.parent / "material_0.png"
 
@@ -152,7 +164,7 @@ class DataLoader:
             score=obj_info_dict["score"],
             scale=scale,
             mesh_path=mesh_path,
-            texture_path=texture_path
+            texture_path=texture_path,
         )
 
         # Parse poses
@@ -165,7 +177,7 @@ class DataLoader:
                 R=np.array(pose_dict["R"]),
                 t=np.array(pose_dict["t"]),
                 bbox_visib=pose_dict["bbox_visib"],
-                time=pose_dict["time"]
+                time=pose_dict["time"],
             )
             self.poses.append(pose)
 
@@ -182,7 +194,9 @@ class DataLoader:
             # Auto-load based on mesh_id
             if grasps_directory is None:
                 # Default: trajectory_path/../../filtered_grasps/
-                grasps_directory = object_trajectory_path.parent.parent / "filtered_grasps"
+                grasps_directory = (
+                    object_trajectory_path.parent.parent / "filtered_grasps"
+                )
 
             grasp_file_path = grasps_directory / f"{mesh_id}_filtered.yml"
 
@@ -192,7 +206,8 @@ class DataLoader:
 
                 if not grasp_file_path.exists():
                     print(
-                        f"Warning: Grasp file not found for mesh_id '{mesh_id}' in {grasps_directory}")
+                        f"Warning: Grasp file not found for mesh_id '{mesh_id}' in {grasps_directory}"
+                    )
                     grasp_file_path = None
 
         # Load grasps if path was determined
@@ -206,12 +221,14 @@ class DataLoader:
                     name=grasp_name,
                     confidence=grasp_info["confidence"],
                     position=np.array(grasp_info["position"]),
-                    orientation=np.array([
-                        orientation_data["w"],
-                        orientation_data["xyz"][0],
-                        orientation_data["xyz"][1],
-                        orientation_data["xyz"][2]
-                    ])
+                    orientation=np.array(
+                        [
+                            orientation_data["w"],
+                            orientation_data["xyz"][0],
+                            orientation_data["xyz"][1],
+                            orientation_data["xyz"][2],
+                        ]
+                    ),
                 )
                 self.grasp_poses.append(grasp)
 
@@ -244,37 +261,40 @@ class ConfigLoader:
 
     @staticmethod
     def load(yaml_path: str | pathlib.Path) -> RobotConfig:
-        with open(yaml_path, 'r') as f:
+        with open(yaml_path, "r") as f:
             config = yaml.safe_load(f)
 
-        weights = config['weights']
+        weights = config["weights"]
         return RobotConfig(
-            W_xREG=weights['W_xREG'],
-            W_uREG=weights['W_uREG'],
-            W_gripper_pose=weights['W_gripper_pose'],
-            W_gripper_pose_term=weights['W_gripper_pose_term'],
-            W_limit=weights['W_limit'],
-            safety_threshold=config['safety_threshold'],
+            W_xREG=weights["W_xREG"],
+            W_uREG=weights["W_uREG"],
+            W_gripper_pose=weights["W_gripper_pose"],
+            W_gripper_pose_term=weights["W_gripper_pose_term"],
+            W_limit=weights["W_limit"],
+            safety_threshold=config["safety_threshold"],
             T=config["T"],
-            dt=config['dt'],
-            gripper_depth=config['gripper_depth']
+            dt=config["dt"],
+            gripper_depth=config["gripper_depth"],
         )
 
 
 if __name__ == "__main__":
     grasp_path = pathlib.Path(
-        "/workspaces/object_following_ocp/ressources/filtered_grasps/0d0d1c59b0474d2ea92ce2e172c9f56a_filtered.yml")
+        "/workspaces/object_following_ocp/ressources/filtered_grasps/0d0d1c59b0474d2ea92ce2e172c9f56a_filtered.yml"
+    )
     object_traj_path = pathlib.Path(
-        "/workspaces/object_following_ocp/ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json")
+        "/workspaces/object_following_ocp/ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
+    )
     scale_path = pathlib.Path(
-        "/workspaces/object_following_ocp/ressources/grasps_scales.json")
+        "/workspaces/object_following_ocp/ressources/grasps_scales.json"
+    )
 
     # Old way (still works)
     print("=== Example 1: Explicit grasp path ===")
     dataloader = DataLoader(
         object_trajectory_path=object_traj_path,
         grasp_poses_SE3_path=grasp_path,
-        scales_path=scale_path
+        scales_path=scale_path,
     )
     print(f"Loaded {len(dataloader.grasp_poses)} grasps")
 
@@ -283,14 +303,13 @@ if __name__ == "__main__":
     dataloader2 = DataLoader(
         object_trajectory_path=object_traj_path,
         scales_path=scale_path,
-        load_grasps=True
+        load_grasps=True,
     )
     print(f"Loaded {len(dataloader2.grasp_poses)} grasps")
 
     # Without grasps
     print("\n=== Example 3: No grasps ===")
     dataloader3 = DataLoader(
-        object_trajectory_path=object_traj_path,
-        scales_path=scale_path
+        object_trajectory_path=object_traj_path, scales_path=scale_path
     )
     print(f"Has grasps: {dataloader3.has_grasps}")

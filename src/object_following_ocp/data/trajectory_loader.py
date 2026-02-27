@@ -9,8 +9,8 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pinocchio as pin
 
-from object_following_ocp.data_loader import ConfigLoader, DataLoader
-from object_following_ocp.trajectories import (
+from object_following_ocp.data.data_loader import ConfigLoader, DataLoader
+from object_following_ocp.geom.trajectories import (
     TrajectoryInConfigurationSpace,
     TrajectorySE3,
 )

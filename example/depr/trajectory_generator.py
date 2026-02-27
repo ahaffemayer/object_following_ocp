@@ -10,8 +10,11 @@ from robomeshcat import Object, Robot, Scene
 
 from object_following_ocp.dataclass import ConfigLoader
 from object_following_ocp.grasp_generator import GraspGenerator
-from object_following_ocp.ocp import OCP
-from object_following_ocp.robot_loader import load_reduced_panda, self_collision_pairs
+from object_following_ocp.solver.ocp import OCP
+from object_following_ocp.robot.robot_loader import (
+    load_reduced_panda,
+    self_collision_pairs,
+)
 from object_following_ocp.trajectory import (
     Trajectory,
     TrajectoryEvaluator,
@@ -179,12 +182,10 @@ def camera_to_robot_trajectory(parser, camera_translation, yaw, object_id=None):
 # -----------------------------
 
 if __name__ == "__main__":
-
     tstart = time.time()
 
     # Load robot configuration from YAML
-    robot_config = ConfigLoader.load(
-        Path(__file__).parent / "robot_config.yml")
+    robot_config = ConfigLoader.load(Path(__file__).parent / "robot_config.yml")
 
     # Load trajectory data from JSON
     json_path = Path(
@@ -203,14 +204,12 @@ if __name__ == "__main__":
     object_id = object_info.mesh_id
 
     # Scale
-    scale_path = Path(
-        "/workspaces/object_following_ocp/ressources/grasps_scales.json")
+    scale_path = Path("/workspaces/object_following_ocp/ressources/grasps_scales.json")
     with open(scale_path, "r") as f:
         scale_data = json.load(f)
 
     match = next(
-        (item for item in scale_data if item["Name"].strip() == object_id),
-        None
+        (item for item in scale_data if item["Name"].strip() == object_id), None
     )
 
     if match is None:
@@ -379,7 +378,8 @@ if __name__ == "__main__":
                     "grasp": valid_q,
                     "grasp_idx": grasp_idx,
                     "T_object_grasp": T_object_grasp,
-                })
+                }
+            )
 
     print(
         f"Valid cases after grasp filtering: {len(valid_cases)} (from {len(all_trajs_robot)} camera configs)"
@@ -492,12 +492,10 @@ if __name__ == "__main__":
             ee_pose = rdata.oMf[ee_frame_id]
 
             scene.add_object(
-                Object.create_sphere(
-                    radius=0.01, name=f"ee_{k}", color=[0, 1, 0])
+                Object.create_sphere(radius=0.01, name=f"ee_{k}", color=[0, 1, 0])
             )
             scene.add_object(
-                Object.create_sphere(
-                    radius=0.01, name=f"target_{k}", color=[1, 0, 0])
+                Object.create_sphere(radius=0.01, name=f"target_{k}", color=[1, 0, 0])
             )
 
             scene[f"ee_{k}"].pos[:] = ee_pose.translation
@@ -564,8 +562,7 @@ if __name__ == "__main__":
                     "camera_translation": case["camera_translation"].tolist(),
                     "ee_trajectory_se3": trajectory_se3_to_list(ee_pose_list),
                     "joint_trajectory": joint_trajectory_to_list(xs, rmodel.nq),
-                    "target_se3": trajectory_se3_to_list(traj_robot)
-
+                    "target_se3": trajectory_se3_to_list(traj_robot),
                 }
 
                 saved_trajectories.append(saved_case)
@@ -589,8 +586,7 @@ if __name__ == "__main__":
         with open(output_path, "w") as f:
             json.dump(saved_trajectories, f, indent=2)
 
-    replay = input(
-        "Replay saved trajectories without objects? [y/N]: ").strip().lower()
+    replay = input("Replay saved trajectories without objects? [y/N]: ").strip().lower()
 
     if replay == "y":
         # Hide the main object, keep o_EE visible
@@ -607,7 +603,8 @@ if __name__ == "__main__":
 
         for saved_idx, saved_case in enumerate(saved_trajectories):
             print(
-                f"Replaying saved trajectory {saved_idx + 1}/{len(saved_trajectories)}")
+                f"Replaying saved trajectory {saved_idx + 1}/{len(saved_trajectories)}"
+            )
 
             joint_traj = saved_case["joint_trajectory"]
             ee_traj = saved_case["ee_trajectory_se3"]
@@ -634,7 +631,6 @@ if __name__ == "__main__":
 
             input("Press Enter for next trajectory...")
 
-        print(
-            f"Saved {len(saved_trajectories)} trajectories to {output_path}")
+        print(f"Saved {len(saved_trajectories)} trajectories to {output_path}")
     else:
         print("No trajectories were saved.")

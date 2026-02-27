@@ -9,7 +9,7 @@ import numpy as np
 import pinocchio as pin
 import pytest
 
-from object_following_ocp.ik_curobo import RobotIKSolver
+from object_following_ocp.solver.ik_curobo import RobotIKSolver
 
 
 @pytest.fixture(scope="module")

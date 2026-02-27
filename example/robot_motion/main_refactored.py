@@ -13,9 +13,9 @@ from robomeshcat import Object, Robot, Scene
 from example.robot_motion.utils.trajectory_ik_solver import TrajectoryIKSolver
 from example.robot_motion.utils.trajectory_visualizer import TrajectoryVisualizer
 
-from object_following_ocp.data_loader import ConfigLoader, DataLoader
-from object_following_ocp.ocp import OCP
-from object_following_ocp.robot_loader import load_reduced_panda
+from object_following_ocp.data.data_loader import ConfigLoader, DataLoader
+from object_following_ocp.solver.ocp import OCP
+from object_following_ocp.robot.robot_loader import load_reduced_panda
 
 if __name__ == "__main__":
     # ========================================================================

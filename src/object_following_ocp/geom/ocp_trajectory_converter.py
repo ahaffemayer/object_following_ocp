@@ -3,14 +3,13 @@ Wrapper for computing trajectories for OCP from object trajectories.
 """
 
 import numpy as np
-import pinocchio as pin
 
-from object_following_ocp.data_loader import DataLoader, RobotConfig
-from object_following_ocp.grasp_transforms import (
+from object_following_ocp.data.data_loader import DataLoader, RobotConfig
+from object_following_ocp.geom.grasp_transforms import (
     GraspTransformChain,
     GraspTransformConfig,
 )
-from object_following_ocp.trajectories import TrajectorySE3
+from object_following_ocp.geom.trajectories import TrajectorySE3
 
 
 class OCPTrajectoryConverter:
