@@ -1,8 +1,8 @@
 weights:
-  W_xREG: 0.00010
+  W_xREG: 0.0010
   W_uREG: 0.0001
-  W_gripper_pose: 1000.0
-  W_gripper_pose_term: 1000.0
+  W_gripper_pose: 100.0
+  W_gripper_pose_term: 100.0
   W_limit: 1.0
 
 safety_threshold: 0.02

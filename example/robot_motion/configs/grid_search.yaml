@@ -1,0 +1,231 @@
+
+bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.6
+  x_max: 0.6
+  nx: 4
+  y_min: -1.0
+  y_max: -0.5
+  ny: 3
+  z_min: -1.8
+  z_max: -1.2
+  nz: 3
+
+bowl2.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.6
+  x_max: 0.6
+  nx: 4
+  y_min: -1.0
+  y_max: -0.5
+  ny: 3
+  z_min: -1.8
+  z_max: -1.2
+  nz: 3
+
+bowl3.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.8
+  y_max: -0.3
+  ny: 3
+  z_min: -2.1
+  z_max: -1.8
+  nz: 3
+
+bowl4.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.2
+  x_max: 0.2
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.2
+  z_max: -0.8
+  nz: 3
+
+bowl5.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.8
+  y_max: -0.3
+  ny: 3
+  z_min: -2.8
+  z_max: -2.5
+  nz: 3
+
+bowl6.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -2.8
+  z_max: -2.5
+  nz: 3
+
+bowl7.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -2.0
+  z_max: -1.5
+  nz: 3
+
+campbells1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.2
+  x_max: 0.2
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.2
+  z_max: -0.5
+  nz: 3
+
+campbells2.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.2
+  x_max: 0.2
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.2
+  z_max: -0.5
+  nz: 3
+
+campbells3.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.2
+  x_max: 0.2
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.2
+  z_max: -0.5
+  nz: 3
+
+campbells4.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.2
+  x_max: 0.2
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.2
+  z_max: -0.5
+  nz: 3
+
+cups.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -2.0
+  z_max: -1.5
+  nz: 3
+
+jug.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.5
+  z_max: -1.0
+  nz: 3
+
+juice.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.5
+  z_max: -1.2
+  nz: 3
+
+pour_268.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.2
+  z_max: -0.8
+  nz: 3
+
+pour_805.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.5
+  z_max: -1.2
+  nz: 3
+
+pour_2100.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.5
+  z_max: -1.2
+  nz: 3
+
+pour_2257.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.9
+  z_max: -1.2
+  nz: 3
+
+pour_2866.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -2.1
+  z_max: -1.8
+  nz: 3
+
+pour_4168.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.7
+  x_max: 0.0
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -2.1
+  z_max: -1.8
+  nz: 3
+
+pour_4711.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg:
+  x_min: -0.3
+  x_max: 0.3
+  nx: 3
+  y_min: -0.9
+  y_max: -0.5
+  ny: 3
+  z_min: -1.5
+  z_max: -1.2
+  nz: 3
