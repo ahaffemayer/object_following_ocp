@@ -8,11 +8,17 @@ Usage:
 import pathlib
 import pickle
 import sys
+import time
 
 import numpy as np
+import pinocchio as pin
 from robomeshcat import Object, Robot, Scene
 
-from object_following_ocp.data_loader import DataLoader
+from object_following_ocp.data_loader import ConfigLoader, DataLoader
+from object_following_ocp.grasp_transforms import (
+    GraspTransformChain,
+    GraspTransformConfig,
+)
 from object_following_ocp.robot_loader import load_reduced_panda
 
 OUTPUT_DIR = pathlib.Path("/mnt/user-data/outputs")
@@ -41,6 +47,9 @@ def main():
 
     trajectories = data["trajectories"]
     print(f"Loaded {len(trajectories)} trajectories for '{mesh_id}'")
+
+    config_path = pathlib.Path(data["config_path"])
+    robot_config = ConfigLoader.load(config_path)
 
     # -------------------------
     # Setup robot and scene
@@ -71,6 +80,8 @@ def main():
         color=[0.8, 0.8, 0.8],
     )
     scene.add_object(obj)
+    scene.camera_pos = [3, 0, 1]
+    scene.camera_zoom = 2
 
     # -------------------------
     # Replay each trajectory
@@ -84,6 +95,7 @@ def main():
 
         ocp_states = traj["joint_trajectory_ocp"]
         object_poses = traj["object_trajectory_poses"]
+        tcp_poses = traj["tcp_trajectory_poses"]
         cam = traj["camera_translation"]
 
         print(f"\n{'=' * 50}")
@@ -93,13 +105,42 @@ def main():
         print(f"{'=' * 50}")
         input("Press Enter to start...")
 
+        grasp_config = GraspTransformConfig.from_robot_config(
+            robot_config=robot_config,
+            camera_translation=np.array(cam),
+            grasp_correction_angle_deg=data["grasp_correction_angle_deg"],
+            elevation_angle_deg=data["elevation_angle_deg"],
+        )
+        chain = GraspTransformChain(grasp_config)
+
         for k, xs in enumerate(ocp_states):
-            robot[:] = xs[: rmodel.nq]
-            if k < len(object_poses):
-                obj.pose = np.array(object_poses[k])
-            input(
-                f"  frame {k + 1}/{len(ocp_states)} — Enter to continue, Ctrl+C to stop"
+            q = np.array(xs[: rmodel.nq])
+            robot[:] = q
+            pin.framesForwardKinematics(rmodel, rdata, q)
+            tcp_se3 = rdata.oMf[rmodel.getFrameId("panda_hand_tcp")]
+            object_se3 = chain.compute_object_pose_from_tcp(
+                tcp_se3, dataloader.best_grasp_SE3
             )
+            if k < len(object_poses):
+                obj.pose = object_se3.homogeneous
+                # obj.pose = np.array(object_poses[k])
+                time.sleep(0.01)
+            # input(
+            #     f"  frame {k + 1}/{len(ocp_states)} — Enter to continue, Ctrl+C to stop"
+            # )
+        render = input("Render this trajectory? y/n")
+        if "y" in render:
+            with scene.video_recording(filename=f"{mesh_id}.mp4", fps=25):
+                for k, xs in enumerate(ocp_states):
+                    q = np.array(xs[: rmodel.nq])
+                    robot[:] = q
+                    pin.framesForwardKinematics(rmodel, rdata, q)
+                    tcp_se3 = rdata.oMf[rmodel.getFrameId("panda_hand_tcp")]
+                    object_se3 = chain.compute_object_pose_from_tcp(
+                        tcp_se3, dataloader.best_grasp_SE3
+                    )
+                    obj.pose = object_se3.homogeneous
+                    scene.render()
 
 
 if __name__ == "__main__":
