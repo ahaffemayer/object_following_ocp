@@ -6,5 +6,6 @@ weights:
   W_limit: 100.0
 
 safety_threshold: 0.02
+T: 10
 dt: 0.01
 gripper_depth: 0.1034

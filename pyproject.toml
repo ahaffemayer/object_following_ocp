@@ -8,23 +8,32 @@ name = "object_following_ocp"
 version = "0.1.0"
 description = "Panda robot following an object using optimal control."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "colmpc>=0.3.0",
     "matplotlib>=3.9.4",
     "meshcat>=0.3.2",
     "natsort>=8.4.0",
     "proxsuite!=0.7.2.post1",
-    "robomeshcat >=1.1.4",
-    "pandas >=2.0.0",
-    "pycollada >=0.8",
+    "robomeshcat>=1.1.4",
+    "pandas>=2.0.0",
+    "pycollada>=0.8",
+    "torch",
+    "torchvision",
 ]
 
 [[tool.uv.index]]
 explicit = true
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
 
 [tool.uv.sources]
-torch = [ { index = "pytorch-cpu" } ]
-torchvision = [ { index = "pytorch-cpu" } ]
+torch = [{ index = "pytorch-cu130" }]
+torchvision = [{ index = "pytorch-cu130" }]
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"

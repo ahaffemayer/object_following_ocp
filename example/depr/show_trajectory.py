@@ -4,25 +4,27 @@ import numpy as np
 import pinocchio as pin
 from robomeshcat import Object, Robot, Scene
 
-from object_following_ocp.dataclass import ConfigLoader
-from object_following_ocp.robot_loader import load_reduced_panda, self_collision_pairs
-from object_following_ocp.trajectory_parser import JSONTrajectoryParser
+from object_following_ocp.depr.dataclass import ConfigLoader
+from object_following_ocp.depr.trajectory_parser import JSONTrajectoryParser
+from object_following_ocp.robot.robot_loader import (
+    load_reduced_panda,
+    self_collision_pairs,
+)
 
 # -----------------------------
 # Main
 # -----------------------------
 if __name__ == "__main__":
     # Load robot configuration from YAML
-    robot_config = ConfigLoader.load(
-        Path(__file__).parent / "robot_config.yml")
+    robot_config = ConfigLoader.load(Path(__file__).parent / "robot_config.yml")
 
     # Load trajectory data from JSON
     json_path = Path(
-        "/workspaces/object_following_ocp/ressources/json/jug.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json")
+        "/workspaces/object_following_ocp/ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
+    )
 
     # Parser automatically resolves mesh paths and applies smoothing
-    traj_parser = JSONTrajectoryParser(
-        json_path, smooth_depth=True, smooth_k=2.0)
+    traj_parser = JSONTrajectoryParser(json_path, smooth_depth=True, smooth_k=2.0)
 
     # Show available objects
     print("Available objects:", traj_parser.get_available_objects())

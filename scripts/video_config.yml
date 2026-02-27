@@ -1,0 +1,94 @@
+# Grid sequence: start fullscreen (1), zoom out to 2x2, then 4x4
+grid_seq: [1, 2, 4, 8]
+videos:
+
+
+videos:
+  # Top-left 4x4 block
+  - block:
+    - block:  # top-left 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl1/bowl1_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl1/bowl1_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl1/bowl1_panda.mp4
+    - block:  # top-right 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/bowl2.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+    - block:  # bottom-left 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/bowl3.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+    - block:  # bottom-right 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/bowl4.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4      
+  # Top-right 4x4 block  (videos 16-31)
+  - block:
+    - block:  # top-left 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/bowl5.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl5/bowl5_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl5/bowl5_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl5/bowl5_panda.mp4
+    - block:  # top-right 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/bowl6.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+    - block:  # bottom-left 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/bowl7.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+    - block:  # bottom-right 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/campbells1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4        
+    # Bottom-left 4x4 block  (videos 32-47)
+  - block:
+    - block:  # top-left 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/campbells2.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl1/bowl1_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl1/bowl1_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl1/bowl1_panda.mp4
+    - block:  # top-right 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/campbells3.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+    - block:  # bottom-left 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/campbells4.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+    - block:  # bottom-right 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/cups.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4      
+    # Bottom-right 4x4 block  (videos 48-63)
+  - block:
+    - block:  # top-left 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/jug.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl1/bowl1_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl1/bowl1_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl1/bowl1_panda.mp4
+    - block:  # top-right 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/juice.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl2/bowl2_panda.mp4
+    - block:  # bottom-left 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/pour_268.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl3/bowl3_panda.mp4
+    - block:  # bottom-right 2x2
+      - path: /workspaces/object_following_ocp/ressources/video/pour_805.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4
+      - path: /workspaces/object_following_ocp/results/bowl4/bowl4_panda.mp4      

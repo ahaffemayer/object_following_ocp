@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pinocchio as pin
 
-from object_following_ocp.trajectory import Trajectory
+from object_following_ocp.depr.trajectory import Trajectory
 
 
 @dataclass
