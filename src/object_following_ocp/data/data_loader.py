@@ -15,7 +15,6 @@ class ObjectInfo:
     """Object information from JSON"""
 
     mesh_id: str
-    score: float
     scale: float
     mesh_path: pathlib.Path
     texture_path: Optional[pathlib.Path] = None
@@ -27,7 +26,6 @@ class PoseData:
 
     im_id: int
     object_id: int
-    score: float
     R: np.ndarray  # 3x3 rotation matrix
     t: np.ndarray  # 3x1 translation vector
     bbox_visib: list[int]
@@ -157,11 +155,10 @@ class DataLoader:
             / f"{mesh_id}.obj"
         )
         # Texture path (same folder but different name)
-        texture_path = mesh_path.parent / "material_0.png"
+        texture_path = mesh_path.parent / f"{mesh_id}.png"
 
         self.object_info = ObjectInfo(
             mesh_id=mesh_id,
-            score=obj_info_dict["score"],
             scale=scale,
             mesh_path=mesh_path,
             texture_path=texture_path,
@@ -173,7 +170,6 @@ class DataLoader:
             pose = PoseData(
                 im_id=pose_dict["im_id"],
                 object_id=pose_dict["object_id"],
-                score=pose_dict["score"],
                 R=np.array(pose_dict["R"]),
                 t=np.array(pose_dict["t"]),
                 bbox_visib=pose_dict["bbox_visib"],

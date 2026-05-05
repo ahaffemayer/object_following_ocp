@@ -65,6 +65,7 @@ class TrajectoryReviewer:
         config_path: pathlib.Path,
         grasp_correction_angle_deg: float = 90.0,
         elevation_angle_deg: float = 25.0,
+        ee_frame_name: str = "panda_hand_tcp",
     ):
         self.dataloader = dataloader
         self.robot_config = robot_config
@@ -76,6 +77,7 @@ class TrajectoryReviewer:
         self.config_path = config_path
         self.grasp_correction_angle_deg = grasp_correction_angle_deg
         self.elevation_angle_deg = elevation_angle_deg
+        self.ee_frame_name = ee_frame_name
         self.kept_trajectories: List[ReviewedTrajectory] = []
 
     def solve_ocp_for_candidate(self, candidate: TrajectoryCandidate) -> tuple:
@@ -112,6 +114,7 @@ class TrajectoryReviewer:
             safety_threshold=self.robot_config.safety_threshold,
             T=T_ocp,
             dt=self.robot_config.dt,
+            ee_frame_name=self.ee_frame_name,
         )
         ocp = OCP_creator.create_OCP()
 

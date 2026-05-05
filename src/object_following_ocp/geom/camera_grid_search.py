@@ -12,18 +12,18 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import numpy as np
-from object_following_ocp.geom.ik_trajectory_converter import IKTrajectoryConverter
-from object_following_ocp.solver.trajectory_ik_solver import TrajectoryIKSolver
 
 from object_following_ocp.data.data_loader import DataLoader, RobotConfig
 from object_following_ocp.geom.grasp_transforms import (
     GraspTransformChain,
     GraspTransformConfig,
 )
+from object_following_ocp.geom.ik_trajectory_converter import IKTrajectoryConverter
 from object_following_ocp.geom.trajectories import (
     TrajectoryInConfigurationSpace,
     TrajectorySE3,
 )
+from object_following_ocp.solver.trajectory_ik_solver import TrajectoryIKSolver
 
 
 @dataclass
@@ -81,6 +81,7 @@ class CameraPositionGridSearch:
         grasp_correction_angle_deg: float = 90.0,
         elevation_angle_deg: float = 25.0,
         verbose: bool = True,
+        robot_name: str = "franka",
     ):
         """
         Initialize grid search.
@@ -103,10 +104,11 @@ class CameraPositionGridSearch:
         self.grasp_correction_angle_deg = grasp_correction_angle_deg
         self.elevation_angle_deg = elevation_angle_deg
         self.verbose = verbose
+        self.robot_name = robot_name
 
         # Initialize IK solver (reused for all positions)
         self.ik_solver = TrajectoryIKSolver(
-            robot_name="franka",
+            robot_name=self.robot_name,
             num_seeds=20,
             position_threshold=0.005,
             rotation_threshold=0.05,
