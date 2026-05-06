@@ -172,14 +172,20 @@ class TrajectoryReviewer:
         self,
         candidates: List[TrajectoryCandidate],
     ) -> List[ReviewedTrajectory]:
-        """Process all candidates and keep all of them."""
+        """Process only candidates with 100% IK success rate."""
+        eligible = [c for c in candidates if c.ik_success_rate >= 100.0]
+        skipped = len(candidates) - len(eligible)
+
         print("\n" + "=" * 70)
-        print(f"PROCESSING {len(candidates)} TRAJECTORY CANDIDATES")
+        print(
+            f"PROCESSING {len(eligible)}/{len(candidates)} TRAJECTORY CANDIDATES"
+            + (f" (skipped {skipped} with IK < 100%)" if skipped else "")
+        )
         print("=" * 70)
 
         self.kept_trajectories = []
-        for idx, candidate in enumerate(candidates):
-            reviewed = self.review_trajectory(candidate, idx, len(candidates))
+        for idx, candidate in enumerate(eligible):
+            reviewed = self.review_trajectory(candidate, idx, len(eligible))
             self.kept_trajectories.append(reviewed)
 
         print("\n" + "=" * 70)
