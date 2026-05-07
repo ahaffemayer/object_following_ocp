@@ -360,10 +360,13 @@ class CameraPositionGridSearch:
             if candidate is not None:
                 self.valid_trajectories.append(candidate)
                 if self.verbose:
-                    print(
-                        f"  ✓ SUCCESS - IK success rate: "
-                        f"{candidate.ik_success_rate:.1f}%"
-                    )
+                    if candidate.ik_success_rate >= 100.0:
+                        print(f"  ✓ SUCCESS - IK success rate: 100.0%")
+                    else:
+                        print(
+                            f"  ✗ FAILED - IK success rate: "
+                            f"{candidate.ik_success_rate:.1f}%"
+                        )
             else:
                 if self.verbose:
                     print("  ✗ FAILED - First pose IK failed")
@@ -416,10 +419,13 @@ class CameraPositionGridSearch:
             if candidate is not None:
                 self.valid_trajectories.append(candidate)
                 if self.verbose:
-                    print(
-                        f"  ✓ SUCCESS - IK success rate: "
-                        f"{candidate.ik_success_rate:.1f}%"
-                    )
+                    if candidate.ik_success_rate >= 100.0:
+                        print(f"  ✓ SUCCESS - IK success rate: 100.0%")
+                    else:
+                        print(
+                            f"  ✗ FAILED - IK success rate: "
+                            f"{candidate.ik_success_rate:.1f}%"
+                        )
             else:
                 if self.verbose:
                     print("  ✗ FAILED - First pose IK failed")

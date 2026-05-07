@@ -109,6 +109,7 @@ class TrajectoryIKSolver:
                         f"pos_err={info['position_error']:.6f}m, "
                         f"rot_err={info['rotation_error']:.6f}rad"
                     )
+                break
 
         success_rate = 100 * success_count / len(trajectory)
 

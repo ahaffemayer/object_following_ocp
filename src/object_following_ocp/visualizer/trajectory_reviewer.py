@@ -5,7 +5,7 @@ Trajectory reviewer with OCP solving — auto-keeps all valid trajectories.
 import pathlib
 import pickle
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import pinocchio as pin
@@ -27,6 +27,7 @@ class ReviewedTrajectory:
     joint_trajectory_ocp: List[np.ndarray]
     tcp_trajectory_poses: List[np.ndarray]
     ik_success_rate: float
+    tracking_cost: float = 0.0
     user_notes: str = ""
 
     def to_dict(self) -> dict:
@@ -39,6 +40,7 @@ class ReviewedTrajectory:
             "joint_trajectory_ocp": [xs.tolist() for xs in self.joint_trajectory_ocp],
             "tcp_trajectory_poses": [p.tolist() for p in self.tcp_trajectory_poses],
             "ik_success_rate": self.ik_success_rate,
+            "tracking_cost": self.tracking_cost,
             "user_notes": self.user_notes,
         }
 
@@ -133,13 +135,25 @@ class TrajectoryReviewer:
         ocp.solve(X_init, U_init)
         return ocp, tcp_traj_world
 
+    def _compute_tracking_cost(self, ocp, tcp_traj_world) -> float:
+        """Sum of squared SE3 log norms between actual OCP TCP poses and target."""
+        rdata = self.rmodel.createData()
+        ee_frame_id = self.rmodel.getFrameId(self.ee_frame_name)
+        cost = 0.0
+        for xs, target_pose in zip(ocp.xs, tcp_traj_world.poses):
+            q = xs[: self.rmodel.nq]
+            pin.framesForwardKinematics(self.rmodel, rdata, q)
+            xi = pin.log6(rdata.oMf[ee_frame_id].inverse() * target_pose).vector
+            cost += float(np.dot(xi, xi))
+        return cost
+
     def review_trajectory(
         self,
         candidate: TrajectoryCandidate,
         trajectory_idx: int,
         total_trajectories: int,
     ) -> ReviewedTrajectory:
-        """Solve OCP, animate, and return the reviewed trajectory."""
+        """Solve OCP and score — does not animate."""
         print("\n" + "=" * 70)
         print(f"TRAJECTORY {trajectory_idx + 1}/{total_trajectories}")
         print("=" * 70)
@@ -147,13 +161,8 @@ class TrajectoryReviewer:
         print(f"IK success rate: {candidate.ik_success_rate:.1f}%")
 
         ocp, tcp_trajectory = self.solve_ocp_for_candidate(candidate)
-
-        print("Displaying OCP solution...")
-        self.visualizer.animate_ocp_solution(
-            ocp_states=ocp.xs,
-            object_trajectory=candidate.object_trajectory,
-            rmodel=self.rmodel,
-        )
+        tracking_cost = self._compute_tracking_cost(ocp, tcp_trajectory)
+        print(f"  Tracking cost: {tracking_cost:.6f}")
 
         reviewed = ReviewedTrajectory(
             camera_translation=candidate.camera_translation,
@@ -164,15 +173,29 @@ class TrajectoryReviewer:
             joint_trajectory_ocp=ocp.xs,
             tcp_trajectory_poses=[p.homogeneous for p in tcp_trajectory.poses],
             ik_success_rate=candidate.ik_success_rate,
+            tracking_cost=tracking_cost,
         )
-        print("✓ Trajectory saved")
         return reviewed
+
+    def _animate_reviewed(
+        self,
+        reviewed: ReviewedTrajectory,
+        candidate: TrajectoryCandidate,
+    ) -> None:
+        print(f"  Displaying trajectory (cost={reviewed.tracking_cost:.6f})...")
+        self.visualizer.animate_ocp_solution(
+            ocp_states=reviewed.joint_trajectory_ocp,
+            object_trajectory=candidate.object_trajectory,
+            rmodel=self.rmodel,
+        )
+        print("  ✓ Done")
 
     def review_all_candidates(
         self,
         candidates: List[TrajectoryCandidate],
+        top_n: Optional[int] = None,
     ) -> List[ReviewedTrajectory]:
-        """Process only candidates with 100% IK success rate."""
+        """Solve OCP for all 100%-IK candidates, then animate only the best top_n."""
         eligible = [c for c in candidates if c.ik_success_rate >= 100.0]
         skipped = len(candidates) - len(eligible)
 
@@ -183,15 +206,28 @@ class TrajectoryReviewer:
         )
         print("=" * 70)
 
-        self.kept_trajectories = []
+        # Step 1: solve OCP and score every eligible candidate
+        scored: List[tuple] = []
         for idx, candidate in enumerate(eligible):
             reviewed = self.review_trajectory(candidate, idx, len(eligible))
-            self.kept_trajectories.append(reviewed)
+            scored.append((reviewed, candidate))
+
+        # Step 2: rank by tracking cost (lower is better), keep best top_n
+        scored.sort(key=lambda x: x[0].tracking_cost)
+        best = scored[:top_n] if top_n is not None else scored
+
+        # Step 3: animate selected trajectories
+        print("\n" + "=" * 70)
+        print(f"ANIMATING {len(best)} BEST TRAJECTORIES (of {len(scored)} solved)")
+        print("=" * 70)
+        for rank, (reviewed, candidate) in enumerate(best):
+            print(f"\n[{rank + 1}/{len(best)}] cost={reviewed.tracking_cost:.6f}  camera={reviewed.camera_translation}")
+            self._animate_reviewed(reviewed, candidate)
+
+        self.kept_trajectories = [r for r, _ in best]
 
         print("\n" + "=" * 70)
-        print(
-            f"DONE — saved {len(self.kept_trajectories)}/{len(candidates)} trajectories"
-        )
+        print(f"DONE — kept {len(self.kept_trajectories)}/{len(candidates)} trajectories")
         print("=" * 70)
         return self.kept_trajectories
 

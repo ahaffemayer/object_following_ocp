@@ -86,7 +86,7 @@ class DataLoader:
     def __init__(
         self,
         object_trajectory_path: pathlib.Path,
-        scales_path: pathlib.Path,
+        scales_path: Optional[pathlib.Path] = None,
         grasp_poses_SE3_path: Optional[pathlib.Path] = None,
         load_grasps: bool = False,
         grasps_directory: Optional[pathlib.Path] = None,
@@ -96,13 +96,16 @@ class DataLoader:
 
         Args:
             object_trajectory_path: Path to object trajectory JSON file
-            scales_path: Path to scales JSON file (contains all objects)
+            scales_path: Path to scales JSON file (optional; if None, scale is read from the trajectory JSON)
             grasp_poses_SE3_path: Path to grasp poses YAML file (optional, takes precedence)
             load_grasps: If True and grasp_poses_SE3_path is None, auto-load grasps based on mesh_id
             grasps_directory: Directory containing grasp files (default: trajectory_path/../../filtered_grasps/)
 
         Usage:
-            # Without grasps
+            # Without grasps, scale from JSON
+            loader = DataLoader(traj_path)
+
+            # With explicit scales file
             loader = DataLoader(traj_path, scales_path)
 
             # With explicit grasp path
@@ -116,16 +119,16 @@ class DataLoader:
                               grasps_directory=Path("custom/grasps/dir"))
         """
         # --- Load scales first (contains ALL objects) ---
-        with open(scales_path, "r") as f:
-            scales_data = json.load(f)
-
         scales: Dict[str, dict] = {}
-        for scale_entry in scales_data:
-            mesh_name = scale_entry["Name"].strip()
-            scales[mesh_name] = {
-                "scale": scale_entry["scale"],
-                "scale_from_dataset": scale_entry["scale_from_dataset"],
-            }
+        if scales_path is not None:
+            with open(scales_path, "r") as f:
+                scales_data = json.load(f)
+            for scale_entry in scales_data:
+                mesh_name = scale_entry["Name"].strip()
+                scales[mesh_name] = {
+                    "scale": scale_entry["scale"],
+                    "scale_from_dataset": scale_entry["scale_from_dataset"],
+                }
 
         # --- Load object trajectory ---
         with open(object_trajectory_path, "r") as f:
