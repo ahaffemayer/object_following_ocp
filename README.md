@@ -51,3 +51,14 @@ python scripts/show_grasps.py --input_yaml pathtofile --mesh_path pathtomesh
 > [!NOTE]
 > If the script is launched but doesn't respond, launch a `meshcat-server` in another terminal in the devcontainer.
 
+
+### Generating the trajectories
+
+Launch this script to run the grid search: 
+
+```bash
+python example/robot_motion/main_grid_search.py   --object-traj path_to_json  --scale-path path_to_scale   --config-path /workspaces/object_following_ocp/example/robot_motion/configs/ocp_config_panda.yml   --top-n 3
+```
+`--scale-path` is not necessary, it's only if you want to tweak the scales. 
+
+
