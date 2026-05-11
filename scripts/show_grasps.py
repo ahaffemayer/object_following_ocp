@@ -1,9 +1,10 @@
+import argparse
+
 import meshcat
 import meshcat.geometry as g
 import meshcat.transformations as mtf
 import numpy as np
 import trimesh
-import trimesh.transformations as tra
 import yaml
 
 # ============================================================
@@ -16,11 +17,13 @@ def quat_to_rot(qw, qx, qy, qz):
     q /= np.linalg.norm(q)
 
     w, x, y, z = q
-    return np.array([
-        [1 - 2*(y*y + z*z), 2*(x*y - z*w),     2*(x*z + y*w)],
-        [2*(x*y + z*w),     1 - 2*(x*x + z*z), 2*(y*z - x*w)],
-        [2*(x*z - y*w),     2*(y*z + x*w),     1 - 2*(x*x + y*y)],
-    ])
+    return np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    )
 
 
 def grasp_to_T(grasp, apply_tcp_offset=False, gripper_depth=0.1034):
@@ -54,6 +57,7 @@ def grasp_to_T(grasp, apply_tcp_offset=False, gripper_depth=0.1034):
 # Visualization helpers
 # ============================================================
 
+
 def create_visualizer(clear=True):
     vis = meshcat.Visualizer(zmq_url="tcp://127.0.0.1:6000")
     if clear:
@@ -62,13 +66,8 @@ def create_visualizer(clear=True):
 
 
 def visualize_mesh(vis, name, mesh, color=(180, 180, 180), T=None):
-    material = g.MeshPhongMaterial(
-        color="0x%02x%02x%02x" % color
-    )
-    vis[name].set_object(
-        g.TriangularMeshGeometry(mesh.vertices, mesh.faces),
-        material
-    )
+    material = g.MeshPhongMaterial(color="0x%02x%02x%02x" % color)
+    vis[name].set_object(g.TriangularMeshGeometry(mesh.vertices, mesh.faces), material)
     if T is not None:
         vis[name].set_transform(T)
 
@@ -80,15 +79,14 @@ def make_frame(vis, name, T, h=0.08, r=0.003):
         "z": 0x0000FF,
     }
     axes = {
-        "x": ([0, 0, 1], np.pi / 2, [h/2, 0, 0]),
-        "y": ([0, 1, 0], np.pi / 2, [0, h/2, 0]),
-        "z": ([1, 0, 0], np.pi / 2, [0, 0, h/2]),
+        "x": ([0, 0, 1], np.pi / 2, [h / 2, 0, 0]),
+        "y": ([0, 1, 0], np.pi / 2, [0, h / 2, 0]),
+        "z": ([1, 0, 0], np.pi / 2, [0, 0, h / 2]),
     }
 
     for ax, (axis, angle, trans) in axes.items():
         vis[name][ax].set_object(
-            g.Cylinder(height=h, radius=r),
-            g.MeshLambertMaterial(color=colors[ax])
+            g.Cylinder(height=h, radius=r), g.MeshLambertMaterial(color=colors[ax])
         )
         M = mtf.rotation_matrix(angle, axis)
         M[:3, 3] = trans
@@ -101,20 +99,22 @@ def visualize_gripper(vis, name, T, width=0.08, depth=0.06, color=0xFF0000):
     points = []
 
     def box(x, y, z):
-        return np.array([
-            [-x, -y, -z],
-            [x, -y, -z],
-            [x,  y, -z],
-            [-x,  y, -z],
-            [-x, -y,  z],
-            [x, -y,  z],
-            [x,  y,  z],
-            [-x,  y,  z],
-        ])
+        return np.array(
+            [
+                [-x, -y, -z],
+                [x, -y, -z],
+                [x, y, -z],
+                [-x, y, -z],
+                [-x, -y, z],
+                [x, -y, z],
+                [x, y, z],
+                [-x, y, z],
+            ]
+        )
 
-    finger = box(0.005, depth/2, 0.02)
-    left = finger + np.array([width/2, 0, 0])
-    right = finger + np.array([-width/2, 0, 0])
+    finger = box(0.005, depth / 2, 0.02)
+    left = finger + np.array([width / 2, 0, 0])
+    right = finger + np.array([-width / 2, 0, 0])
 
     for part in [left, right]:
         P = np.hstack([part, np.ones((8, 1))]).T
@@ -122,10 +122,7 @@ def visualize_gripper(vis, name, T, width=0.08, depth=0.06, color=0xFF0000):
 
     for i, P in enumerate(points):
         vis[name + f"/finger_{i}"].set_object(
-            g.Line(
-                g.PointsGeometry(P),
-                g.MeshBasicMaterial(color=color)
-            )
+            g.Line(g.PointsGeometry(P), g.MeshBasicMaterial(color=color))
         )
 
     vis[name].set_transform(T)
@@ -150,31 +147,34 @@ def visualize_gripper_as_sphere(vis, name, T, radius=0.01, color=0xFF0000):
     # This moves the sphere to the grasp position and orientation
     vis[name].set_transform(T.astype(np.float64))
 
+
 # ============================================================
 # Main
 # ============================================================
 
 
 def main():
-    grasp_yaml = "/workspaces/object_following_ocp/ressources/filtered_grasps/0d0d1c59b0474d2ea92ce2e172c9f56a_filtered.yml"
-    object_mesh_path = "/workspaces/object_following_ocp/ressources/meshes/0d0d1c59b0474d2ea92ce2e172c9f56a/0d0d1c59b0474d2ea92ce2e172c9f56a.obj"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input_yaml", type=str, required=True)
+    parser.add_argument("--mesh_path", type=str, required=True)
+    args = parser.parse_args()
+
     gripper_depth = 0.09  # From your config file
 
     vis = create_visualizer(clear=True)
 
     # Load mesh with same processing as GraspGen
-    mesh = trimesh.load(object_mesh_path, force="mesh")
+    mesh = trimesh.load(args.mesh_path, force="mesh")
     mesh.apply_scale(0.070489)
 
     visualize_mesh(vis, "object", mesh)
 
-    with open(grasp_yaml, "r") as f:
+    with open(args.input_yaml, "r") as f:
         data = yaml.safe_load(f)
 
     for i, (k, grasp) in enumerate(data["grasps"].items()):
         # Convert to TCP frame
-        T_tcp = grasp_to_T(grasp, apply_tcp_offset=True,
-                           gripper_depth=gripper_depth)
+        T_tcp = grasp_to_T(grasp, apply_tcp_offset=True, gripper_depth=gripper_depth)
 
         # Visualize TCP position
         make_frame(vis, f"grasps/{k}/frame", T_tcp)

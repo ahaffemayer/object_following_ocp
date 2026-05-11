@@ -5,30 +5,30 @@ Refactored object following with OCP - using modular wrappers.
 import pathlib
 
 import numpy as np
-from example.robot_motion.utils.ik_trajectory_converter import IKTrajectoryConverter
-from example.robot_motion.utils.ocp_trajectory_converter import OCPTrajectoryConverter
 from robomeshcat import Object, Robot, Scene
 
-# Import our new wrappers
-from example.robot_motion.utils.trajectory_ik_solver import TrajectoryIKSolver
-from example.robot_motion.utils.trajectory_visualizer import TrajectoryVisualizer
-
 from object_following_ocp.data.data_loader import ConfigLoader, DataLoader
-from object_following_ocp.solver.ocp import OCP
+from object_following_ocp.geom.ik_trajectory_converter import IKTrajectoryConverter
+from object_following_ocp.geom.ocp_trajectory_converter import OCPTrajectoryConverter
 from object_following_ocp.robot.robot_loader import load_reduced_panda
+from object_following_ocp.solver.ocp import OCP
+
+# Import our new wrappers
+from object_following_ocp.solver.trajectory_ik_solver import TrajectoryIKSolver
+from object_following_ocp.visualizer.trajectory_visualizer import TrajectoryVisualizer
 
 if __name__ == "__main__":
     # ========================================================================
     # SETUP: Load data and robot
     # ========================================================================
     object_traj_path = pathlib.Path(
-        "/workspaces/object_following_ocp/ressources/json/bowl1.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg.json"
+        "/workspaces/object_following_ocp/ressources/howto100m_AYkkIu7RArQ_0/howto100m_AYkkIu7RArQ_0.props-sam3d.gpt4_scaled.best_object.megapose-ref-3-sym.smoothed-savgol.filtered-iou-0.2.json"
     )
     scale_path = pathlib.Path(
         "/workspaces/object_following_ocp/ressources/grasps_scales.json"
     )
     config_path = pathlib.Path(
-        "/workspaces/object_following_ocp/example/robot_motion/configs/ocp_config.yml"
+        "/workspaces/object_following_ocp/example/robot_motion/configs/ocp_config_panda.yml"
     )
 
     # Load data
@@ -67,7 +67,8 @@ if __name__ == "__main__":
         path_to_mesh=dataloader.object_info.mesh_path,
         name="robot/movable_obj",
         texture=dataloader.object_info.texture_path,
-        scale=dataloader.object_info.scale,
+        # scale=dataloader.object_info.scale,
+        scale=0.1,
         color=[0.8, 0.8, 0.8],
     )
     scene.add_object(movable_object)
@@ -81,7 +82,7 @@ if __name__ == "__main__":
 
     ik_converter = IKTrajectoryConverter(
         robot_config=robot_config,
-        camera_translation=np.array([0, -0.7, -1.0]),
+        camera_translation=np.array([0, -0.0, -0.0]),
         grasp_correction_angle_deg=90.0,
         elevation_angle_deg=25.0,
     )
@@ -190,7 +191,7 @@ if __name__ == "__main__":
         object_trajectory=object_traj_world,
         rmodel=rmodel,
         rdata=rdata,
-        interactive=True,
+        dt=0.05,
     )
 
     # ========================================================================
@@ -262,10 +263,7 @@ if __name__ == "__main__":
     print("=" * 60)
 
     visualizer.animate_ocp_solution(
-        ocp_states=ocp.xs,
-        object_trajectory=object_traj_world,
-        rmodel=rmodel,
-        interactive=True,
+        ocp_states=ocp.xs, object_trajectory=object_traj_world, rmodel=rmodel, dt=0.05
     )
 
     print("\n" + "=" * 60)

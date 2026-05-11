@@ -15,7 +15,6 @@ class ObjectInfo:
     """Object information from JSON"""
 
     mesh_id: str
-    score: float
     scale: float
     mesh_path: pathlib.Path
     texture_path: Optional[pathlib.Path] = None
@@ -27,7 +26,6 @@ class PoseData:
 
     im_id: int
     object_id: int
-    score: float
     R: np.ndarray  # 3x3 rotation matrix
     t: np.ndarray  # 3x1 translation vector
     bbox_visib: list[int]
@@ -88,7 +86,7 @@ class DataLoader:
     def __init__(
         self,
         object_trajectory_path: pathlib.Path,
-        scales_path: pathlib.Path,
+        scales_path: Optional[pathlib.Path] = None,
         grasp_poses_SE3_path: Optional[pathlib.Path] = None,
         load_grasps: bool = False,
         grasps_directory: Optional[pathlib.Path] = None,
@@ -98,13 +96,16 @@ class DataLoader:
 
         Args:
             object_trajectory_path: Path to object trajectory JSON file
-            scales_path: Path to scales JSON file (contains all objects)
+            scales_path: Path to scales JSON file (optional; if None, scale is read from the trajectory JSON)
             grasp_poses_SE3_path: Path to grasp poses YAML file (optional, takes precedence)
             load_grasps: If True and grasp_poses_SE3_path is None, auto-load grasps based on mesh_id
             grasps_directory: Directory containing grasp files (default: trajectory_path/../../filtered_grasps/)
 
         Usage:
-            # Without grasps
+            # Without grasps, scale from JSON
+            loader = DataLoader(traj_path)
+
+            # With explicit scales file
             loader = DataLoader(traj_path, scales_path)
 
             # With explicit grasp path
@@ -118,16 +119,16 @@ class DataLoader:
                               grasps_directory=Path("custom/grasps/dir"))
         """
         # --- Load scales first (contains ALL objects) ---
-        with open(scales_path, "r") as f:
-            scales_data = json.load(f)
-
         scales: Dict[str, dict] = {}
-        for scale_entry in scales_data:
-            mesh_name = scale_entry["Name"].strip()
-            scales[mesh_name] = {
-                "scale": scale_entry["scale"],
-                "scale_from_dataset": scale_entry["scale_from_dataset"],
-            }
+        if scales_path is not None:
+            with open(scales_path, "r") as f:
+                scales_data = json.load(f)
+            for scale_entry in scales_data:
+                mesh_name = scale_entry["Name"].strip()
+                scales[mesh_name] = {
+                    "scale": scale_entry["scale"],
+                    "scale_from_dataset": scale_entry["scale_from_dataset"],
+                }
 
         # --- Load object trajectory ---
         with open(object_trajectory_path, "r") as f:
@@ -157,11 +158,10 @@ class DataLoader:
             / f"{mesh_id}.obj"
         )
         # Texture path (same folder but different name)
-        texture_path = mesh_path.parent / "material_0.png"
+        texture_path = mesh_path.parent / f"{mesh_id}.png"
 
         self.object_info = ObjectInfo(
             mesh_id=mesh_id,
-            score=obj_info_dict["score"],
             scale=scale,
             mesh_path=mesh_path,
             texture_path=texture_path,
@@ -173,7 +173,6 @@ class DataLoader:
             pose = PoseData(
                 im_id=pose_dict["im_id"],
                 object_id=pose_dict["object_id"],
-                score=pose_dict["score"],
                 R=np.array(pose_dict["R"]),
                 t=np.array(pose_dict["t"]),
                 bbox_visib=pose_dict["bbox_visib"],

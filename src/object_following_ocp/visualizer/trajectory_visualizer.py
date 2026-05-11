@@ -150,6 +150,7 @@ class TrajectoryVisualizer:
         rmodel: pin.Model,
         rdata: pin.Data,
         dt: float = 0.01,
+        ee_frame_name: str = "panda_hand_tcp",
     ) -> List[pin.SE3]:
         """
         Animate the robot through a joint trajectory.
@@ -162,7 +163,7 @@ class TrajectoryVisualizer:
         Returns:
             List of TCP SE3 poses collected during animation
         """
-        tcp_frame_id = rmodel.getFrameId("panda_hand_tcp")
+        tcp_frame_id = rmodel.getFrameId(ee_frame_name)
         tcp_poses = []
 
         for k, q in enumerate(joint_trajectory):

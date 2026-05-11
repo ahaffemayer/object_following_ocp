@@ -10,45 +10,101 @@ Workflow:
 6. For each valid trajectory, solve OCP, animate, and auto-save
 """
 
+import argparse
 import pathlib
 
 import numpy as np
-from object_following_ocp.geom.camera_grid_search import CameraPositionGridSearch
 from robomeshcat import Object, Robot, Scene
+
+from object_following_ocp.data.data_loader import ConfigLoader, DataLoader
+from object_following_ocp.geom.camera_grid_search import CameraPositionGridSearch
+from object_following_ocp.robot.robot_loader import load_reduced_panda
 from object_following_ocp.visualizer.trajectory_reviewer import TrajectoryReviewer
 from object_following_ocp.visualizer.trajectory_visualizer import TrajectoryVisualizer
 
-from object_following_ocp.data.data_loader import ConfigLoader, DataLoader
-from object_following_ocp.robot.robot_loader import load_reduced_panda
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Camera position grid search and trajectory review."
+    )
+
+    # --- Required paths ---
+    parser.add_argument(
+        "--object-traj",
+        type=pathlib.Path,
+        required=True,
+        help="Path to the object trajectory JSON file.",
+    )
+    parser.add_argument(
+        "--config-path",
+        type=pathlib.Path,
+        required=True,
+        help="Path to the OCP config YAML file.",
+    )
+
+    # --- Optional paths ---
+    parser.add_argument(
+        "--scale-path",
+        type=pathlib.Path,
+        default=None,
+        help="Path to the grasps/scales JSON file (optional; if omitted, scale is read from the trajectory JSON).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=pathlib.Path,
+        default=pathlib.Path("/mnt/user-data/outputs"),
+        help="Directory where results are saved (default: /mnt/user-data/outputs).",
+    )
+
+    # --- Grid search parameters ---
+    parser.add_argument(
+        "--target-position",
+        type=float,
+        nargs=3,
+        default=[0.0, 0.0, 0.7],
+        metavar=("X", "Y", "Z"),
+        help="Target world-frame position for the trajectory average (default: 0 0 0.7).",
+    )
+    parser.add_argument(
+        "--half-extents",
+        type=float,
+        nargs=3,
+        default=[0.2, 0.2, 0.2],
+        metavar=("DX", "DY", "DZ"),
+        help="Half-extents of the grid search per axis (default: 0.2 0.2 0.2).",
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        nargs=3,
+        default=[3, 3, 3],
+        metavar=("NX", "NY", "NZ"),
+        help="Number of grid samples per axis (default: 3 3 3).",
+    )
+
+    # --- Trajectory selection ---
+    parser.add_argument(
+        "--top-n",
+        type=int,
+        default=3,
+        help="Number of best trajectories to keep and visualise (default: 3).",
+    )
+
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
-    # ========================================================================
-    # CONFIGURATION
-    # ========================================================================
-    traj_name = "pour_4168.props-dinov2-ffa-22.gpt4_scaled.best_object.poses-dinov2-22-graph.smoothed-movavg"
-    object_traj_path = pathlib.Path(
-        f"/workspaces/object_following_ocp/ressources/json/{traj_name}.json"
-    )
-    scale_path = pathlib.Path(
-        "/workspaces/object_following_ocp/ressources/grasps_scales.json"
-    )
-    config_path = pathlib.Path(
-        "/workspaces/object_following_ocp/example/robot_motion/configs/ocp_config.yml"
-    )
+    args = parse_args()
 
-    output_dir = pathlib.Path("/mnt/user-data/outputs")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Derive trajectory name from the input file stem for output naming
+    traj_name = args.object_traj.stem
 
-    # --- Grid search parameters (relative, not absolute) -----------------
-    # Where should the trajectory's average land in world frame?
-    # E.g. [0, 0, 0] for origin, or [0, 0, 0.7] for table height.
-    TARGET_POSITION = np.array([0.0, 0.0, 0.7])
+    args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    # How far to search around the auto-computed reference camera (± per axis)
-    HALF_EXTENTS = (0.2, 0.2, 0.2)
-
-    # Number of grid samples per axis
-    STEPS = (3, 3, 3)
+    TARGET_POSITION = np.array(args.target_position)
+    HALF_EXTENTS = tuple(args.half_extents)
+    STEPS = tuple(args.steps)
+    N = args.top_n
 
     # ========================================================================
     # SETUP
@@ -59,11 +115,11 @@ if __name__ == "__main__":
     print("=" * 70)
 
     dataloader = DataLoader(
-        object_trajectory_path=object_traj_path,
-        scales_path=scale_path,
+        object_trajectory_path=args.object_traj,
+        scales_path=args.scale_path,
         load_grasps=True,
     )
-    robot_config = ConfigLoader.load(config_path)
+    robot_config = ConfigLoader.load(args.config_path)
 
     print(f"\nLoaded object: {dataloader.object_info.mesh_id}")
     print(f"Trajectory length: {len(dataloader.poses)} poses")
@@ -73,8 +129,8 @@ if __name__ == "__main__":
     print(f"Gripper depth: {robot_config.gripper_depth} m")
 
     mesh_id = dataloader.object_info.mesh_id
-    grid_search_results_path = output_dir / f"{traj_name}_grid_search_results.pkl"
-    kept_trajectories_path = output_dir / f"{traj_name}_kept_trajectories.pkl"
+    grid_search_results_path = args.output_dir / f"{traj_name}_grid_search_results.pkl"
+    kept_trajectories_path = args.output_dir / f"{traj_name}_kept_trajectories.pkl"
 
     print(f"\nOutput: {grid_search_results_path.name}, {kept_trajectories_path.name}")
 
@@ -112,9 +168,9 @@ if __name__ == "__main__":
     grid_search = CameraPositionGridSearch(
         dataloader=dataloader,
         robot_config=robot_config,
-        object_traj_path=object_traj_path,
-        scale_path=scale_path,
-        config_path=config_path,
+        object_traj_path=args.object_traj,
+        scale_path=args.scale_path,
+        config_path=args.config_path,
         grasp_correction_angle_deg=90.0,
         elevation_angle_deg=25.0,
         verbose=True,
@@ -162,14 +218,14 @@ if __name__ == "__main__":
         visualizer=visualizer,
         rmodel=rmodel,
         cmodel=cmodel,
-        object_traj_path=object_traj_path,
-        scale_path=scale_path,
-        config_path=config_path,
+        object_traj_path=args.object_traj,
+        scale_path=args.scale_path,
+        config_path=args.config_path,
         grasp_correction_angle_deg=90.0,
         elevation_angle_deg=25.0,
     )
 
-    kept_trajectories = reviewer.review_all_candidates(valid_trajectories)
+    kept_trajectories = reviewer.review_all_candidates(valid_trajectories, top_n=N)
 
     if kept_trajectories:
         reviewer.save_kept_trajectories(kept_trajectories_path)
@@ -179,7 +235,7 @@ if __name__ == "__main__":
         for idx, traj in enumerate(kept_trajectories):
             print(
                 f"  [{idx + 1}] camera={traj.camera_translation}  "
-                f"IK={traj.ik_success_rate:.1f}%"
+                f"IK={traj.ik_success_rate:.1f}%  cost={traj.tracking_cost:.6f}"
             )
 
     # ========================================================================
